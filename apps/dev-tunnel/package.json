@@ -1,0 +1,7 @@
+{
+  "name": "@stepwhere/dev-tunnel",
+  "private": true,
+  "scripts": {
+    "dev": "bash scripts/tunnel.sh"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@stepwhere/share-view",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "infisical run --env=dev --projectId=800069dc-a7e4-4c31-a461-01bb866e8d91 -- vite --host 127.0.0.1 --port 5175",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1 --port 4175"
+  },
+  "dependencies": {
+    "@googlemaps/js-api-loader": "^2.1.0",
+    "@stepwhere/types": "workspace:*",
+    "lucide-react": "^0.554.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/google.maps": "^3.65.1",
+    "@types/react": "~19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
+  }
+}

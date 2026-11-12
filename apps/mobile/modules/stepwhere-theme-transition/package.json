@@ -1,0 +1,22 @@
+{
+  "name": "stepwhere-theme-transition",
+  "version": "1.0.0",
+  "author": {
+    "email": "aryanmishra530@gmail.com",
+    "name": "v3locity47"
+  },
+  "description": "Native circular theme transition module for StepWhere.",
+  "files": [
+    "android/build.gradle",
+    "android/src",
+    "ios",
+    "index.ts",
+    "expo-module.config.json"
+  ],
+  "main": "index.ts",
+  "private": true,
+  "license": "ISC",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

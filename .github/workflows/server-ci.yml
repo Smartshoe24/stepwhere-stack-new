@@ -1,0 +1,50 @@
+name: Server CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".dockerignore"
+      - ".github/workflows/build-and-release.yml"
+      - ".github/workflows/server-ci.yml"
+      - "apps/server/**"
+      - "deploy/docker-compose.prod.yml"
+      - "deploy/env.production.example"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck server
+        run: pnpm --filter @stepwhere/server typecheck
+
+      - name: Run server tests
+        run: pnpm --filter @stepwhere/server test
+
+      - name: Build server image
+        run: docker build --file apps/server/Dockerfile --tag stepwhere-server:ci .

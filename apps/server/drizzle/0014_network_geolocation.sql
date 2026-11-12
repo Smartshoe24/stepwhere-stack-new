@@ -1,0 +1,1 @@
+ALTER TYPE "public"."location_source" ADD VALUE 'network' BEFORE 'none';

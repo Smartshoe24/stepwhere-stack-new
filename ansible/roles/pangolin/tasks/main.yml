@@ -1,0 +1,47 @@
+---
+- name: Check the Pangolin secret
+  ansible.builtin.assert:
+    that:
+      - vault_pangolin_server_secret | length >= 32
+    fail_msg: vault_pangolin_server_secret must be at least 32 characters (openssl rand -hex 32).
+    quiet: true
+
+- name: Create the Pangolin directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ pangolin_config_dir }}", mode: "0755" }
+    - { path: "{{ pangolin_config_dir }}/traefik", mode: "0755" }
+    - { path: "{{ pangolin_config_dir }}/letsencrypt", mode: "0700" }
+
+- name: Write Pangolin's config.yml
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ pangolin_config_dir }}/config.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart pangolin
+
+- name: Write Traefik's static config
+  ansible.builtin.template:
+    src: traefik_config.yml.j2
+    dest: "{{ pangolin_config_dir }}/traefik/traefik_config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart traefik
+
+# Traefik watches this file, so no restart is needed.
+- name: Write Traefik's dynamic config
+  ansible.builtin.template:
+    src: dynamic_config.yml.j2
+    dest: "{{ pangolin_config_dir }}/traefik/dynamic_config.yml"
+    owner: root
+    group: root
+    mode: "0644"

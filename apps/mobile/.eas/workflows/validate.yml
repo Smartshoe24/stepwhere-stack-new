@@ -1,0 +1,35 @@
+name: Validate Mobile
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "apps/mobile/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+
+defaults:
+  tools:
+    node: "24"
+    pnpm: "10.33.0"
+
+jobs:
+  validate:
+    name: Validate Mobile
+    defaults:
+      run:
+        working_directory: .
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Typecheck mobile
+        run: pnpm --filter @stepwhere/mobile typecheck
+      - name: Lint mobile
+        run: pnpm --filter @stepwhere/mobile lint
+      - name: Validate development Expo config
+        run: APP_VARIANT=development pnpm --filter @stepwhere/mobile exec expo config --json >/tmp/stepwhere-mobile-development-config.json
+      - name: Validate production Expo config
+        run: APP_VARIANT=production pnpm --filter @stepwhere/mobile exec expo config --json >/tmp/stepwhere-mobile-production-config.json

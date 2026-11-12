@@ -1,0 +1,38 @@
+# Managed by Ansible. Sourced by the stepwhere-*-backup scripts.
+#
+# The backups bucket has Object Lock and the instance role may only PutObject:
+# nothing here lists or deletes remote objects.
+
+AWS_CLI_IMAGE="{{ backups_aws_cli_image }}"
+BUCKET="{{ backups_bucket }}"
+AWS_REGION="{{ backups_region }}"
+
+today_utc="$(date -u +%F)"
+month_utc="$(date -u +%Y-%m)"
+day_of_month_utc="$(date -u +%d)"
+
+# hc_ping <base-url> [/fail]: dead-man's-switch ping. Skipped when the URL is empty.
+hc_ping() {
+  [ -n "${1:-}" ] || return 0
+  curl -fsS -m 10 --retry 3 -o /dev/null "${1}${2:-}" || echo "healthchecks ping failed" >&2
+}
+
+# s3_put <local file> <key>: upload with the instance role (IMDSv2, hop limit 2).
+s3_put() {
+  docker run --rm -e AWS_REGION="$AWS_REGION" -v "$1:/upload:ro" "$AWS_CLI_IMAGE" \
+    s3 cp --only-show-errors /upload "s3://${BUCKET}/$2"
+}
+
+# start_job <healthchecks url>: make a scratch dir; on exit remove it and ping success or failure.
+start_job() {
+  HC_URL="${1:-}"
+  workdir="$(mktemp -d -p "${STATE_DIRECTORY:-/var/tmp}" job.XXXXXX)"
+  trap finish_job EXIT
+}
+
+finish_job() {
+  local rc=$?
+  rm -rf "$workdir"
+  if [ "$rc" -eq 0 ]; then hc_ping "$HC_URL"; else hc_ping "$HC_URL" /fail; fi
+  exit "$rc"
+}

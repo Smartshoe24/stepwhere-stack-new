@@ -1,0 +1,9 @@
+#cloud-config
+# Only what Ansible needs to connect. Everything else is configured by Ansible.
+hostname: ${hostname}
+preserve_hostname: false
+package_update: true
+packages:
+  - python3
+runcmd:
+  - systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service

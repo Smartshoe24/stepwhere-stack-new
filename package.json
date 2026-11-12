@@ -1,0 +1,47 @@
+{
+  "name": "stepwhere",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "process-compose up -U -u /tmp/stepwhere-dev.sock --ordered-shutdown -L .dev/process-compose.log -f process-compose.yaml",
+    "predev": "node scripts/dev/doctor.mjs --quick",
+    "dev:public": "process-compose up -U -u /tmp/stepwhere-dev.sock --ordered-shutdown -L .dev/process-compose.log -f process-compose.yaml -f dev/process-compose.public.yaml",
+    "predev:public": "node scripts/dev/doctor.mjs --quick --public",
+    "dev:mobile": "process-compose up -U -u /tmp/stepwhere-dev.sock --ordered-shutdown -L .dev/process-compose.log -f process-compose.yaml -f dev/process-compose.mobile.yaml",
+    "predev:mobile": "node scripts/dev/doctor.mjs --quick",
+    "dev:public:mobile": "process-compose up -U -u /tmp/stepwhere-dev.sock --ordered-shutdown -L .dev/process-compose.log -f process-compose.yaml -f dev/process-compose.public.yaml -f dev/process-compose.mobile.yaml",
+    "predev:public:mobile": "node scripts/dev/doctor.mjs --quick --public",
+    "dev:simulator": "process-compose up -U -u /tmp/stepwhere-dev.sock --ordered-shutdown -L .dev/process-compose.log -f process-compose.yaml -f dev/process-compose.simulator.yaml",
+    "predev:simulator": "node scripts/dev/doctor.mjs --quick",
+    "dev:attach": "process-compose attach -U -u /tmp/stepwhere-dev.sock",
+    "dev:down": "process-compose down -U -u /tmp/stepwhere-dev.sock",
+    "dev:logs": "process-compose process logs -U -u /tmp/stepwhere-dev.sock -f -n 200",
+    "dev:restart": "process-compose process restart -U -u /tmp/stepwhere-dev.sock",
+    "dev:status": "process-compose process list -U -u /tmp/stepwhere-dev.sock",
+    "dev:doctor": "node scripts/dev/doctor.mjs",
+    "dev:turbo": "turbo dev --filter @stepwhere/server --filter @stepwhere/mobile",
+    "dev:firmware": "turbo dev --filter @stepwhere/server --filter shadcn-admin --filter @stepwhere/dev-tunnel",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "db:up": "docker compose up -d postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:logs": "docker compose logs -f postgres",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "turbo": "^2.9.14",
+    "typescript": "~5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.2.3",
+      "react-dom": "19.2.3"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+---
+# Non-secret settings for the prod host. Secrets live in vault.yml (see vault.example.yml).
+
+aws_region: ap-south-1
+aws_account_id: "045837342042"
+ecr_registry: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com"
+
+# Domains. DNS is managed by hand at the DNS provider.
+domain_base: stepwhere.in
+domain_access: access.stepwhere.in # Pangolin dashboard
+domain_api: api.stepwhere.in
+domain_share: share.stepwhere.in
+domain_ingest: ingest.stepwhere.in
+domain_panel: panel.stepwhere.in
+domain_monitor: monitor.stepwhere.in
+domain_logs: logs.stepwhere.in
+acme_email: ceo@stepwhere.in
+
+# Buckets
+s3_storage_bucket: stepwhere-storage
+s3_backups_bucket: stepwhere-backups
+
+# RDS endpoint host name (no port): `tofu output` in infra/prod. Backups stay off while empty.
+rds_endpoint: "stepwhere-prod-db.c9a60c4ya72z.ap-south-1.rds.amazonaws.com"
+rds_database: stepwhere
+rds_backup_user: stepwhere_backup
+
+# Infisical (the server runs `infisical run` with these). The token is in the vault.
+infisical_env: prod
+infisical_project_id: "c54a008b-1814-4bfe-bafa-564b6f330113" # required: set to the Infisical project ID
+infisical_path: /
+
+# Pinned third-party images. Versions checked on Docker Hub (all publish linux/arm64).
+pangolin_image: docker.io/fosrl/pangolin:1.25.3
+gerbil_image: docker.io/fosrl/gerbil:1.5.2
+traefik_image: docker.io/library/traefik:v3.7.16
+traefik_badger_version: v1.8.0 # Pangolin's Traefik auth plugin
+redis_image: redis:7.4-alpine
+beszel_hub_image: henrygd/beszel:0.21.1
+beszel_agent_image: henrygd/beszel-agent:0.21.1
+dozzle_image: amir20/dozzle:v11.3.5
+postgres_client_image: postgres:18-alpine
+aws_cli_image: amazon/aws-cli:2.39.1
+
+# Let's Encrypt directory. Use https://acme-staging-v02.api.letsencrypt.org/directory while testing.
+acme_ca_server: https://acme-v02.api.letsencrypt.org/directory
+
+# Memory limits per Compose service (plan section 6).
+stack_mem_limits:
+  traefik: 256m
+  pangolin: 1g # Next.js + API; the official compose allows up to 2g
+  gerbil: 128m
+  server: 2g
+  device-ingest-proxy: 256m
+  admin: 64m
+  share-view: 64m
+  redis: 512m
+  beszel-hub: 256m
+  beszel-agent: 64m
+  dozzle: 128m
+
+# Set to false on a first run, before the ECR images exist: files are written, nothing is started.
+stack_start: true

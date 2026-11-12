@@ -1,0 +1,21 @@
+---
+# Config files are bind-mounted, so Compose does not notice changes: restart the service.
+# On a first run nothing exists yet and the later `up` starts everything, so restart only
+# a service that already has a container.
+- name: Restart pangolin
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      if [ -n "$(docker compose ps --quiet pangolin)" ]; then docker compose restart pangolin; fi
+    chdir: "{{ pangolin_stack_dir }}"
+  when: stack_start | bool
+  changed_when: true
+
+- name: Restart traefik
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      if [ -n "$(docker compose ps --quiet traefik)" ]; then docker compose restart traefik; fi
+    chdir: "{{ pangolin_stack_dir }}"
+  when: stack_start | bool
+  changed_when: true

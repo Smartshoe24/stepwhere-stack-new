@@ -1,0 +1,29 @@
+# Mobile overlay: `pnpm dev:mobile` (or `pnpm dev:public:mobile`).
+# Metro for the Expo dev client. The app's API URL is the panel tunnel in public
+# mode and this machine's LAN address otherwise (phones can't reach localhost).
+processes:
+  metro:
+    description: Expo dev client bundler
+    working_dir: apps/mobile
+    command: node ../../scripts/dev/run.mjs mobile -- pnpm exec expo start --dev-client --port 8081
+    log_location: .dev/logs/metro.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    is_tty: true
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 8081, path: /status, scheme: http }
+      initial_delay_seconds: 5
+      period_seconds: 3
+      failure_threshold: 100
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+      max_restarts: 5
+    shutdown:
+      signal: 15
+      timeout_seconds: 10
+      parent_only: false

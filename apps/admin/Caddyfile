@@ -1,0 +1,17 @@
+:80 {
+	root * /srv/admin
+	encode zstd gzip
+
+	# Previously added by the edge Caddy; Pangolin (Traefik) doesn't.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-store"
+
+	try_files {path} /index.html
+	file_server
+}

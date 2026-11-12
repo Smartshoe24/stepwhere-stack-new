@@ -1,0 +1,3 @@
+---
+monitoring_beszel_dir: /srv/beszel
+monitoring_data_mount: /srv

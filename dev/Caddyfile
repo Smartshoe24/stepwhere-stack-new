@@ -1,0 +1,48 @@
+# Dev edge for `pnpm dev:public`, mirroring deploy/Caddyfile. Runs in Docker
+# (docker-compose.yml, profile "public") on 127.0.0.1:8800. The Pinggy tunnels
+# end here and Pinggy terminates TLS, so this listens on plain HTTP and never
+# redirects: the firmware needs http:// on the panel host.
+{
+	auto_https off
+	admin off
+	servers {
+		# Requests arrive from the tunnel via Docker's gateway; keep Pinggy's
+		# X-Forwarded-For so the server sees the real client IP.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	log {
+		output stdout
+		format console
+	}
+
+	handle /__edge/health {
+		respond "ok" 200
+	}
+
+	# Live share view: its own origin, because the share websocket checks Origin.
+	@share host {$STEPWHERE_SHARE_HOST:share.invalid}
+	handle @share {
+		handle_path /__share_api/* {
+			reverse_proxy host.docker.internal:8223
+		}
+		reverse_proxy host.docker.internal:5175
+	}
+
+	# Everything else is the panel host: QA agent downloads, API, then admin.
+	handle_path /downloads/* {
+		root * /srv/downloads
+		file_server
+	}
+
+	@api path /v1/* /api/auth/* /health /ready
+	handle @api {
+		reverse_proxy host.docker.internal:8223
+	}
+
+	handle {
+		reverse_proxy host.docker.internal:4800
+	}
+}

@@ -1,0 +1,274 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import './theme.css';
+
+/* The app is dark-only for now; `.dark` is set on <html> in index.html. */
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  html {
+    @apply overflow-x-hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply min-h-svh w-full bg-background font-sans text-sm text-foreground;
+  }
+  ::selection {
+    background: rgb(255 102 203 / 0.32);
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  /* Override Radix scroll locking for sticky headers */
+  body[data-scroll-locked] {
+    overflow: unset !important;
+  }
+
+  /* Cursor pointer for buttons */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Prevent focus zoom on mobile devices */
+  @media screen and (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* ---------- Night Trail utilities ---------- */
+
+/*
+ * Keyboard focus: the element's edge becomes a trail hairline with a soft halo.
+ * Apply to any focusable element; it replaces shadcn's 3px ring. Uses ::after,
+ * so the element must not rely on its own ::after (checkbox uses focus-hair).
+ */
+@utility focus-trail {
+  position: relative;
+  outline: none;
+  &:focus-visible {
+    box-shadow: var(--focus-glow);
+  }
+  &:focus-visible::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--hair);
+    background: var(--trail);
+    opacity: var(--focus-opacity);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+/* Same focus, for wrappers that contain a focusable input (search fields). */
+@utility focus-trail-within {
+  position: relative;
+  &:focus-within {
+    box-shadow: var(--focus-glow);
+  }
+  &:focus-within::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--hair);
+    background: var(--trail);
+    opacity: var(--focus-opacity);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* Solid peach hairline focus for elements whose ::after is taken. */
+@utility focus-hair {
+  outline: none;
+  &:focus-visible {
+    box-shadow:
+      0 0 0 var(--hair) rgb(245 207 141 / 0.8),
+      var(--focus-glow);
+  }
+}
+
+/* A gradient hairline border (Live badge, avatars). */
+@utility trail-border {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--hair);
+    background: var(--trail);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* "You are here" edge: a 1px vertical trail on the leading side. */
+@utility trail-edge {
+  background-image: var(--trail-v);
+  background-size: var(--edge) 100%;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+@utility bg-trail {
+  background-image: var(--trail);
+}
+
+@utility bg-trail-v {
+  background-image: var(--trail-v);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility label-caps {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ---------- Motion ---------- */
+.CollapsibleContent {
+  overflow: hidden;
+}
+.CollapsibleContent[data-state='open'] {
+  animation: slideDown 200ms var(--ease-out-trail);
+}
+.CollapsibleContent[data-state='closed'] {
+  animation: slideUp 160ms var(--ease-out-trail);
+}
+
+@keyframes slideDown {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes trail-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes trail-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -140% 0;
+  }
+}
+
+/* ---------- Map pin (Google Maps overlay) ---------- */
+.night-trail-pin {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.night-trail-pin__halo {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgb(255 102 203 / 0.35),
+    rgb(255 102 203 / 0) 70%
+  );
+  animation: trail-breathe 2.4s var(--ease-move) infinite;
+}
+.night-trail-pin__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 1px;
+  background: var(--trail);
+}
+.night-trail-pin__ring > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--night-overlay);
+  color: var(--ink);
+  font: 600 11px/1 var(--font-sans);
+}

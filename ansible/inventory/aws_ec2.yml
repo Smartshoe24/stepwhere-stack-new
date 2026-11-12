@@ -1,0 +1,15 @@
+---
+# Dynamic inventory: the one running prod app instance, addressed by instance ID.
+# Needs AWS credentials (AWS_PROFILE=stepwhere-prod) and boto3 on the control machine.
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-south-1
+filters:
+  tag:Project: stepwhere
+  tag:Env: prod
+  tag:Role: app
+  instance-state-name: running
+hostnames:
+  - instance-id
+groups:
+  prod: "tags.Env == 'prod'"

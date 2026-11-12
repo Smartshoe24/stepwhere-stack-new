@@ -1,0 +1,23 @@
+---
+docker_apt_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+  - amazon-ecr-credential-helper
+
+docker_daemon_config:
+  log-driver: local
+  log-opts:
+    max-size: 10m
+    max-file: "5"
+  live-restore: true
+
+# ECR login without `docker login`: the helper uses the instance role.
+docker_ecr_registry: "{{ ecr_registry }}"
+# Homes that get ~/.docker/config.json. CI runs compose as root through SSM.
+docker_config_users:
+  - { name: root, home: /root }
+  - { name: deploy, home: /home/deploy }

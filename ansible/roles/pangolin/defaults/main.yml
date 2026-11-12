@@ -1,0 +1,12 @@
+---
+pangolin_dir: /srv/pangolin
+pangolin_config_dir: "{{ pangolin_dir }}/config"
+pangolin_dashboard_domain: "{{ domain_access }}"
+pangolin_base_domain: "{{ domain_base }}"
+pangolin_acme_email: "{{ acme_email }}"
+pangolin_acme_ca_server: "{{ acme_ca_server }}"
+pangolin_badger_version: "{{ traefik_badger_version }}"
+pangolin_server_secret: "{{ vault_pangolin_server_secret }}"
+# Only used by the commented-out ingest fallback router in dynamic_config.yml.
+pangolin_ingest_domain: "{{ domain_ingest }}"
+pangolin_stack_dir: /srv/stepwhere

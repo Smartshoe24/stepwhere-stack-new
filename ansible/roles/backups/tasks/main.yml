@@ -1,0 +1,94 @@
+---
+- name: Check backup settings
+  ansible.builtin.assert:
+    that:
+      - vault_rds_backup_password | length > 0
+    fail_msg: Set vault_rds_backup_password in vault.yml.
+    quiet: true
+
+- name: Warn when the RDS endpoint is not set
+  ansible.builtin.debug:
+    msg: rds_endpoint is empty in group_vars/prod/main.yml, so the database backup is not installed.
+  when: backups_rds_endpoint | length == 0
+
+- name: Create script directories
+  ansible.builtin.file:
+    path: "{{ backups_lib_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the shared backup helpers
+  ansible.builtin.template:
+    src: backup-common.sh.j2
+    dest: "{{ backups_lib_dir }}/backup-common.sh"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write the backup credentials
+  ansible.builtin.template:
+    src: backups.env.j2
+    dest: "{{ backups_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Download the RDS CA bundle
+  ansible.builtin.get_url:
+    url: "{{ backups_rds_ca_url }}"
+    dest: "{{ backups_rds_ca_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+  when: backups_rds_endpoint | length > 0
+
+- name: Install the backup scripts
+  ansible.builtin.template:
+    src: "{{ item.name }}.sh.j2"
+    dest: "{{ backups_bin_dir }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop: "{{ backups_jobs | selectattr('enabled') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install the systemd services
+  ansible.builtin.template:
+    src: backup.service.j2
+    dest: "/etc/systemd/system/{{ item.name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ backups_jobs | selectattr('enabled') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload systemd
+
+- name: Install the systemd timers
+  ansible.builtin.template:
+    src: backup.timer.j2
+    dest: "/etc/systemd/system/{{ item.name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ backups_jobs | selectattr('enabled') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload systemd
+
+- name: Apply systemd changes before enabling the timers
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the backup timers
+  ansible.builtin.systemd_service:
+    name: "{{ item.name }}.timer"
+    enabled: true
+    state: started
+  loop: "{{ backups_jobs | selectattr('enabled') | list }}"
+  loop_control:
+    label: "{{ item.name }}"

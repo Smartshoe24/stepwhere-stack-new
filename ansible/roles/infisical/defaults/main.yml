@@ -1,0 +1,4 @@
+---
+infisical_config_dir: /etc/stepwhere
+infisical_env_file: /etc/stepwhere/infisical.env
+infisical_apt_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}"

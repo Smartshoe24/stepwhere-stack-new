@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Managed by Ansible. Nightly pg_dump of RDS to s3://{{ backups_bucket }}/daily/postgres/.
+set -euo pipefail
+# shellcheck source=/dev/null
+. {{ backups_lib_dir }}/backup-common.sh
+
+PG_IMAGE="{{ backups_postgres_image }}"
+RDS_HOST="{{ backups_rds_endpoint }}"
+RDS_DB="{{ backups_rds_database }}"
+RDS_USER="{{ backups_rds_user }}"
+CA_FILE="{{ backups_rds_ca_file }}"
+
+start_job "${HC_DB_URL:-}"
+dump="$workdir/${today_utc}.dump"
+
+# PGPASSWORD comes from the systemd EnvironmentFile and is passed by name, not value.
+pg() {
+  docker run --rm -i -e PGPASSWORD -e PGSSLMODE=verify-full -e PGSSLROOTCERT=/rds-ca.pem \
+    -v "$CA_FILE:/rds-ca.pem:ro" "$PG_IMAGE" "$@"
+}
+
+pg pg_dump --format=custom --no-password --host="$RDS_HOST" --port=5432 \
+  --username="$RDS_USER" --dbname="$RDS_DB" >"$dump"
+
+# A dump that pg_restore cannot read is worse than no dump.
+[ -s "$dump" ]
+pg pg_restore --list <"$dump" >/dev/null
+
+s3_put "$dump" "daily/postgres/${today_utc}.dump"
+if [ "$day_of_month_utc" = "01" ]; then
+  s3_put "$dump" "monthly/postgres/${month_utc}.dump"
+fi

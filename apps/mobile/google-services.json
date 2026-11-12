@@ -1,0 +1,92 @@
+{
+  "project_info": {
+    "project_number": "285336394990",
+    "project_id": "stepwhere-94c08",
+    "storage_bucket": "stepwhere-94c08.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:285336394990:android:8def4fe7efd16bba66e7ff",
+        "android_client_info": {
+          "package_name": "com.stepwhere"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "285336394990-5j6rdik65ldm8tmcfm13um0olmctha2j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stepwhere",
+            "certificate_hash": "ae98dd213f9aada261b8f394ef61f4255163cb0c"
+          }
+        },
+        {
+          "client_id": "285336394990-fc93ddjtostmv03hvgnfmvak20fgnpra.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stepwhere",
+            "certificate_hash": "72a00ee3485698812af9a88da1fd2083bedc4e93"
+          }
+        },
+        {
+          "client_id": "285336394990-92hibsfebgpsvjh7e921ofr48cbfqeor.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAky45pi_KSBW4Ijuytl7L5wYCVM6L-IUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "285336394990-92hibsfebgpsvjh7e921ofr48cbfqeor.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:285336394990:android:687aecc4908079e566e7ff",
+        "android_client_info": {
+          "package_name": "com.stepwhere.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "285336394990-uo24v6jn4m7o46smu69kg7tt67ethi8l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stepwhere.dev",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "285336394990-92hibsfebgpsvjh7e921ofr48cbfqeor.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAky45pi_KSBW4Ijuytl7L5wYCVM6L-IUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "285336394990-92hibsfebgpsvjh7e921ofr48cbfqeor.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

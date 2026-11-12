@@ -1,0 +1,69 @@
+# Offline checks for infrastructure code. Never runs plan or apply and needs no
+# AWS credentials: plans and applies are run by a human (see AGENTS.md).
+name: Infra Checks
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "ansible/**"
+      - ".github/workflows/infra-checks.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "infra/**"
+      - "ansible/**"
+      - ".github/workflows/infra-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TOFU_ROOTS: infra/bootstrap infra/account infra/prod
+
+jobs:
+  infra-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.12.x
+          tofu_wrapper: false
+
+      - name: Check formatting
+        run: tofu fmt -check -recursive infra
+
+      - name: Validate OpenTofu roots
+        run: |
+          for dir in $TOFU_ROOTS; do
+            echo "::group::$dir"
+            tofu -chdir="$dir" init -backend=false -input=false
+            tofu -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ansible-lint
+        run: pip install ansible-lint
+
+      - name: Install Ansible collections
+        run: |
+          if [ -f ansible/requirements.yml ]; then
+            ansible-galaxy collection install -r ansible/requirements.yml
+          fi
+
+      - name: Lint Ansible
+        working-directory: ansible
+        run: ansible-lint

@@ -1,0 +1,14 @@
+# Managed by Ansible.
+[Unit]
+Description={{ item.description }}
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ backups_env_file }}
+ExecStart={{ backups_bin_dir }}/{{ item.name }}
+# Scratch space for the dump/archive, removed when the job ends.
+StateDirectory={{ item.name }}
+Nice=10

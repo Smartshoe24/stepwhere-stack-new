@@ -1,0 +1,1897 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stepwhere Admin · Production QA mockups (Night Trail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" />
+<!-- Night Trail stylesheet, copied from apps/admin/design/design-system.html -->
+<style>
+/* ==========================================================================
+   Stepwhere Admin: "Night Trail" design system, v0.1 (dark theme)
+   Every value in this file maps to a token below. Token names are
+   theme-neutral in role so a light theme can be added later.
+   ========================================================================== */
+:root {
+  color-scheme: dark;
+
+  /* Night: surfaces. One neutral hue, lightness steps only. */
+  --night-inset:   #050507; /* inputs, wells: below canvas, reads as "type here" */
+  --night-canvas:  #07070A; /* app background and sidebar */
+  --night-raised:  #0E0E12; /* panels, table header, stat rows */
+  --night-overlay: #15151A; /* menus, dialogs, popovers, toasts */
+  --night-hover:   #1C1C22; /* highlighted item inside an overlay */
+
+  /* Lines: low-opacity white so edges blend with any surface */
+  --line-faint:  rgba(255, 255, 255, 0.06);
+  --line:        rgba(255, 255, 255, 0.10);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* Ink: four text levels */
+  --ink:   #F4F4F6; /* primary */
+  --ink-2: #A6A6AE; /* secondary */
+  --ink-3: #80808A; /* tertiary, metadata: AA on every surface */
+  --ink-4: #48484F; /* disabled only */
+
+  /* Brand */
+  --peach: #F5CF8D;
+  --pink:  #FF66CB;
+  --trail:   linear-gradient(90deg, var(--peach) 0%, var(--pink) 100%);
+  --trail-v: linear-gradient(180deg, var(--peach) 0%, var(--pink) 100%);
+
+  /* Peach speaks: anything with a word on it.
+     Text-only actions use peach text; filled actions use a peach wash with white text. */
+  --act-peach:      #F4C87D;                  /* the app's dark-theme accent (mobile navActive) */
+  --act:            var(--act-peach);         /* links, sort arrow, filter values */
+  --act-hover:      #F9DDA9;
+  --act-fill:       rgba(244, 200, 125, 0.24); /* primary button: white text 11.9 : 1 */
+  --act-fill-hover: rgba(244, 200, 125, 0.32);
+  --act-fill-press: rgba(244, 200, 125, 0.18);
+  --act-fill-line:  rgba(244, 200, 125, 0.46);
+  --on-act-fill:    #FFFFFF;
+  --on-peach:       #1B1307;                   /* only for the solid-peach experiment (12.4 : 1) */
+
+  /* Pink switches: state with no words (checkbox, switch, radio, tab underline) */
+  --toggle:       var(--pink);
+  --toggle-wash:  rgba(255, 102, 203, 0.28);
+  --on-toggle:    #14070F;                     /* check marks and knobs on pink */
+  --on-trail:     #14070F;                     /* initials on the gradient avatar */
+
+  /* Gradient hairlines. 0.5px on retina, 1px (one device pixel) elsewhere. */
+  --hair: 1px;
+  --edge: 1px;   /* active-nav and selected-row edge */
+
+  /* Focus: the same weight as a control's own resting border (e.g. the
+     destructive button's 1px edge), drawn in the trail, plus a soft halo. */
+  --focus-hair:    var(--hair);
+  --focus-opacity: 0.8;
+  --focus-glow:
+    0 0 14px -2px rgba(255, 102, 203, 0.24),
+    0 0 6px -1px rgba(245, 207, 141, 0.20);
+
+  /* Peach marks: where you are */
+  --here:      var(--peach);
+  --here-wash: rgba(245, 207, 141, 0.07);
+
+  /* Status: same meanings as the mobile app */
+  --ok:      #4ADE80; --ok-wash:      rgba(74, 222, 128, 0.12);
+  --caution: #FF9F43; --caution-wash: rgba(255, 159, 67, 0.12);
+  --breach:  #F87171; --breach-wash:  rgba(248, 113, 113, 0.12);
+  --info:    #60A5FA; --info-wash:    rgba(96, 165, 250, 0.12);
+  --unset:   #A78BFA; --unset-wash:   rgba(167, 139, 250, 0.12);
+
+  /* Chart series, in order */
+  --chart-1: var(--pink);
+  --chart-2: var(--peach);
+  --chart-3: var(--info);
+  --chart-4: var(--ok);
+  --chart-5: var(--unset);
+
+  /* Type: 1.2 ratio from a 13px base */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --t-11: 11px;
+  --t-12: 12px;
+  --t-13: 13px;
+  --t-14: 14px;
+  --t-16: 16px;
+  --t-19: 19px;
+  --t-23: 23px;
+  --t-28: 28px;
+
+  /* Space: 4px base */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
+
+  /* Sizes: compact density */
+  --h-control:    32px;
+  --h-control-sm: 28px;
+  --h-row:        36px;
+
+  /* Radius: crisp */
+  --r-xs:      4px;  /* checkbox, kbd, menu item */
+  --r-control: 6px;  /* buttons, inputs, nav items */
+  --r-card:    8px;  /* panels, tables, menus */
+  --r-dialog:  12px; /* dialogs, screen frames */
+  --r-pill:    999px;
+
+  /* Depth: borders and surface steps. Shadow only on overlays. */
+  --shadow-overlay: 0 0 0 1px var(--line), 0 16px 40px -12px rgba(0, 0, 0, 0.85), 0 4px 12px -4px rgba(0, 0, 0, 0.6);
+
+  /* Motion */
+  --ease-out:  cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --d-press:   120ms;
+  --d-ui:      160ms;
+  --d-overlay: 200ms;
+}
+
+@media (min-resolution: 2dppx) { :root { --hair: 0.5px; } }
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  margin: 0;
+  background: var(--night-canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  line-height: 1.5;
+}
+h1, h2, h3, h4, h5, p, ol, ul, dl, dd, figure { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: inherit; }
+::selection { background: rgba(255, 102, 203, 0.32); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: var(--t-12); font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Icons: 16px, 1.75 stroke, inherit color */
+.i {
+  width: 16px; height: 16px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.i-sm { width: 14px; height: 14px; }
+
+/* ---------- Trail focus ----------
+   A 1px peach→pink hairline drawn exactly on the element's edge (inheriting its
+   radius, so corners always match) plus a faint halo. It replaces the element's
+   own border while focused rather than stacking a second ring outside it. */
+.fr { position: relative; outline: none; }
+.fr:focus-visible,
+.fr.is-focus,
+.field:focus-within,
+.field.is-focus {
+  box-shadow: var(--focus-glow) !important;
+}
+.fr:focus-visible::after,
+.fr.is-focus::after,
+.field:focus-within::after,
+.field.is-focus::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--focus-hair);
+  background: var(--trail);
+  opacity: var(--focus-opacity);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* Checkbox: its ::after draws the "mixed" dash, so it uses a solid hairline. */
+.check input:focus-visible + .box,
+.box.is-focus {
+  box-shadow: 0 0 0 var(--focus-hair) rgba(245, 207, 141, 0.8), var(--focus-glow) !important;
+}
+@media (forced-colors: active) {
+  .fr:focus-visible, .field:focus-within, .check input:focus-visible + .box { outline: 2px solid CanvasText; outline-offset: 2px; }
+}
+
+/* ---------- Document chrome ---------- */
+.doc-top {
+  position: sticky; top: 0; z-index: 30;
+  height: 56px;
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: 0 var(--s-8);
+  background: rgba(7, 7, 10, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-faint);
+}
+.doc-top .wm { height: 13px; width: auto; color: var(--ink); }
+.doc-ver {
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3);
+  height: 20px; display: inline-flex; align-items: center; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: var(--r-xs);
+}
+.doc-nav { display: flex; gap: 2px; margin-left: auto; }
+.doc-nav a {
+  text-decoration: none; color: var(--ink-3); font-size: var(--t-13); font-weight: 500;
+  height: 30px; display: inline-flex; align-items: center; padding: 0 10px;
+  border-radius: var(--r-control);
+  transition: color var(--d-ui) var(--ease-out), background-color var(--d-ui) var(--ease-out);
+}
+.doc-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+
+.doc { max-width: 1240px; margin: 0 auto; padding: 0 var(--s-8) 160px; }
+
+.hero { padding: 88px 0 24px; }
+.hero h1 {
+  font-size: 56px; line-height: 1.02; font-weight: 600; letter-spacing: -0.035em;
+  margin-top: var(--s-3);
+}
+.hero-lede { margin-top: var(--s-4); max-width: 60ch; font-size: var(--t-16); line-height: 1.55; color: var(--ink-2); text-wrap: pretty; }
+.trail-rule { height: 1px; width: 120px; border-radius: 1px; background: var(--trail); margin: 36px 0 32px; }
+.principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-6); }
+.principles li { font-size: var(--t-13); color: var(--ink-3); line-height: 1.55; text-wrap: pretty; }
+.principles .no { display: block; font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-4); margin-bottom: var(--s-2); }
+.principles b { display: block; color: var(--ink); font-weight: 600; font-size: var(--t-14); margin-bottom: 4px; }
+
+.doc-section { padding-top: 96px; }
+.sec-head { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: var(--s-4); align-items: baseline; margin-bottom: var(--s-8); }
+.sec-no { font-family: var(--font-mono); font-size: var(--t-12); color: var(--ink-4); }
+.sec-title { font-size: var(--t-23); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.sec-lede { grid-column: 2; margin-top: 6px; max-width: 68ch; font-size: var(--t-14); color: var(--ink-2); text-wrap: pretty; }
+
+.sub { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s-3); row-gap: 2px; margin: 44px 0 var(--s-3); }
+.sub:first-of-type { margin-top: 0; }
+.sub h3 { font-size: var(--t-14); font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+.sub p { font-size: var(--t-13); color: var(--ink-3); }
+
+.label {
+  font-size: var(--t-11); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-3); line-height: 1.3;
+}
+.panel { background: var(--night-raised); border: 1px solid var(--line-faint); border-radius: var(--r-card); }
+.specimen { padding: var(--s-6); }
+.spec-grid { display: grid; gap: var(--s-3); }
+.row { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: var(--s-2); }
+.scroll-x { overflow-x: auto; }
+.overlay-grid { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--s-6); }
+.overlay-grid > * { min-width: 0; }
+.scroll-x > .state-grid { min-width: 820px; }
+.state-grid { display: grid; grid-template-columns: 120px repeat(6, minmax(0, 1fr)); align-items: center; gap: var(--s-4) var(--s-3); }
+.state-grid .label { white-space: nowrap; }
+.state-grid .col-h { font-size: var(--t-11); color: var(--ink-4); font-family: var(--font-mono); }
+.note { font-size: var(--t-12); color: var(--ink-3); line-height: 1.5; text-wrap: pretty; }
+.note code, .code { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-2); background: rgba(255, 255, 255, 0.05); padding: 1px 5px; border-radius: var(--r-xs); }
+
+/* ---------- Brand specimens ---------- */
+.brand-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--s-3); }
+.brand-stage {
+  min-height: 220px; display: grid; place-items: center; position: relative; overflow: hidden;
+  background: var(--night-canvas); border: 1px solid var(--line-faint); border-radius: var(--r-card);
+}
+.brand-stage .wm-lg { width: min(420px, 78%); height: auto; color: var(--ink); }
+.brand-stage .em-lg { height: 96px; width: auto; }
+.brand-cap { position: absolute; left: var(--s-4); bottom: var(--s-3); }
+.trail-bar { height: 56px; border-radius: var(--r-card); background: var(--trail); }
+.trail-meta { display: flex; justify-content: space-between; margin-top: var(--s-2); }
+.usage { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.usage .panel { padding: var(--s-5); }
+.usage h4 { font-size: var(--t-13); font-weight: 600; margin-bottom: var(--s-3); display: flex; align-items: center; gap: var(--s-2); }
+.usage li { display: flex; gap: var(--s-2); font-size: var(--t-13); color: var(--ink-2); padding: 5px 0; border-top: 1px solid var(--line-faint); }
+.usage li:first-child { border-top: 0; }
+.usage li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; margin-top: 7px; flex: none; }
+.usage .do li::before { background: var(--trail); }
+.usage .dont li::before { background: var(--ink-4); }
+
+/* ---------- Colour specimens ---------- */
+.surface-stack { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-2); }
+.surface-chip { height: 132px; border-radius: var(--r-card); border: 1px solid var(--line); padding: var(--s-3); display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
+.surface-chip b { font-size: var(--t-13); font-weight: 600; }
+.surface-chip span { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); }
+.nested { padding: var(--s-4); border-radius: var(--r-dialog); background: var(--night-canvas); border: 1px solid var(--line-faint); }
+.nested > div { padding: var(--s-4); border-radius: var(--r-card); background: var(--night-raised); border: 1px solid var(--line-faint); }
+.nested > div > div { padding: var(--s-4); border-radius: var(--r-control); background: var(--night-overlay); box-shadow: var(--shadow-overlay); }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--s-2); }
+.swatch { border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--line-faint); background: var(--night-raised); }
+.swatch-fill { height: 64px; }
+.swatch-meta { padding: 10px var(--s-3) var(--s-3); }
+.swatch-meta b { display: block; font-size: var(--t-13); font-weight: 600; }
+.swatch-meta span { display: block; font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); margin-top: 2px; }
+.swatch-meta p { font-size: var(--t-12); color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
+.ink-rows { display: grid; gap: 1px; background: var(--line-faint); border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--line-faint); }
+.ink-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 150px 110px; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4); background: var(--night-raised); }
+.ink-row .sample { font-size: var(--t-14); }
+.ratio { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); }
+.ratio b { color: var(--ink-2); font-weight: 500; }
+.grade { justify-self: start; font-family: var(--font-mono); font-size: var(--t-11); height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--r-xs); border: 1px solid var(--line); color: var(--ink-2); }
+.grade.aaa { color: var(--ok); border-color: rgba(74, 222, 128, 0.3); }
+.grade.aa { color: var(--ink); }
+.grade.dim { color: var(--ink-3); }
+.role-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.role { padding: var(--s-5); }
+.role h4 { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-14); font-weight: 600; margin-bottom: 4px; }
+.role .dot { width: 10px; height: 10px; border-radius: 50%; }
+.role > p { color: var(--ink-3); font-size: var(--t-13); margin-bottom: var(--s-4); }
+.role-triple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.experiment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.exp-opt { display: flex; flex-direction: column; gap: var(--s-3); }
+.exp-stage { height: 112px; display: grid; place-items: center; border-radius: var(--r-control); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.exp-opt figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.exp-opt figcaption b { font-size: var(--t-13); font-weight: 600; }
+.exp-opt figcaption span:not(.pill) { font-size: var(--t-12); color: var(--ink-3); }
+.exp-opt .pill { margin-top: 4px; }
+.exp-switch { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line-faint); }
+.role-demo { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); background: var(--night-canvas); border: 1px solid var(--line-faint); border-radius: var(--r-control); }
+
+/* ---------- Type specimens ---------- */
+.type-rows { border-top: 1px solid var(--line-faint); }
+.type-row { display: grid; grid-template-columns: 150px 170px minmax(0, 1fr); gap: var(--s-4); align-items: baseline; padding: var(--s-4) 0; border-bottom: 1px solid var(--line-faint); }
+.type-row .spec { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); }
+.type-row .use { font-size: var(--t-12); color: var(--ink-3); }
+.type-row .sample { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.tier-card { padding: var(--s-5); }
+.tier-card .v { font-size: var(--t-14); font-weight: 600; color: var(--ink); }
+.tier-card .l { font-size: var(--t-14); font-weight: 500; color: var(--ink-2); }
+.tier-card .m { font-size: var(--t-14); font-weight: 400; color: var(--ink-3); }
+.mono-samples { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); }
+.mono-samples .panel { padding: var(--s-4); }
+.mono-samples .mono { display: block; margin-top: 6px; color: var(--ink); font-size: var(--t-13); }
+
+/* ---------- Space / radius / depth / motion ---------- */
+.space-rows { display: grid; gap: 6px; }
+.space-row { display: grid; grid-template-columns: 56px 60px minmax(0, 1fr); align-items: center; gap: var(--s-3); }
+.space-row .bar { height: 12px; border-radius: 2px; background: rgba(255, 102, 203, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 102, 203, 0.45); }
+.space-row .mono { color: var(--ink-3); font-size: var(--t-11); }
+.foundations { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.foundations > .panel { padding: var(--s-5); }
+.foundations h4 { font-size: var(--t-13); font-weight: 600; margin-bottom: var(--s-4); }
+.radius-row { display: flex; gap: var(--s-4); align-items: flex-end; }
+.radius-row figure { display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; }
+.radius-row .box { width: 64px; height: 64px; border: 1px solid var(--line-strong); background: var(--night-overlay); }
+.radius-row figcaption { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); }
+.density-row { display: flex; gap: var(--s-5); flex-wrap: wrap; }
+.density-row .mono { color: var(--ink-3); font-size: var(--t-11); }
+.depth-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.depth-demo { height: 96px; border-radius: var(--r-card); display: flex; align-items: flex-end; padding: var(--s-3); font-size: var(--t-12); color: var(--ink-3); }
+.motion-list li { display: grid; grid-template-columns: 140px 72px minmax(0, 1fr); gap: var(--s-3); padding: 6px 0; border-top: 1px solid var(--line-faint); font-size: var(--t-13); color: var(--ink-2); }
+.motion-list li:first-child { border-top: 0; }
+.motion-list .mono { color: var(--ink-3); font-size: var(--t-11); }
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+/* ---------- Button ---------- */
+.btn {
+  --fr-r: var(--r-control);
+  height: var(--h-control);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 12px;
+  border: 0; border-radius: var(--r-control);
+  font-size: var(--t-13); font-weight: 500; line-height: 1; white-space: nowrap;
+  user-select: none;
+  transition: background-color var(--d-ui) var(--ease-out), color var(--d-ui) var(--ease-out), box-shadow var(--d-ui) var(--ease-out), transform var(--d-press) var(--ease-out);
+}
+.btn .i { margin-left: -2px; }
+.btn:active, .btn.is-active { transform: scale(0.97); }
+.btn:disabled, .btn.is-disabled { cursor: not-allowed; transform: none; }
+.btn-sm { height: var(--h-control-sm); padding: 0 10px; font-size: var(--t-12); }
+.btn-icon { width: var(--h-control); padding: 0; }
+.btn-icon .i { margin: 0; }
+.btn-sm.btn-icon { width: var(--h-control-sm); }
+
+/* Primary: peach wash, white text. Warm enough to lead, quiet enough for night. */
+.btn-primary { background: var(--act-fill); color: var(--on-act-fill); font-weight: 600; box-shadow: inset 0 0 0 1px var(--act-fill-line); }
+.btn-primary .i { color: var(--act-peach); }
+.btn-primary:hover, .btn-primary.is-hover { background: var(--act-fill-hover); }
+.btn-primary:active, .btn-primary.is-active { background: var(--act-fill-press); }
+.btn-primary:disabled, .btn-primary.is-disabled { background: rgba(245, 207, 141, 0.05); color: var(--ink-4); box-shadow: inset 0 0 0 1px rgba(245, 207, 141, 0.10); }
+.btn-primary:disabled .i { color: var(--ink-4); }
+
+/* Experiment B: solid peach with dark ink. Toggle page-wide from the Button section. */
+.btn-peach, [data-primary="solid"] .btn-primary { background: var(--peach); color: var(--on-peach); box-shadow: none; }
+.btn-peach .i, [data-primary="solid"] .btn-primary .i { color: var(--on-peach); }
+.btn-peach:hover, .btn-peach.is-hover, [data-primary="solid"] .btn-primary:hover, [data-primary="solid"] .btn-primary.is-hover { background: #F8DCA8; }
+.btn-peach:active, .btn-peach.is-active, [data-primary="solid"] .btn-primary:active, [data-primary="solid"] .btn-primary.is-active { background: #E8BF78; }
+[data-primary="solid"] .btn-primary:disabled { background: rgba(245, 207, 141, 0.18); color: rgba(27, 19, 7, 0.55); }
+[data-primary="solid"] .btn-exp-a { background: var(--act-fill); color: var(--on-act-fill); box-shadow: inset 0 0 0 1px var(--act-fill-line); }
+[data-primary="solid"] .btn-exp-a .i { color: var(--act-peach); }
+/* Experiment C: solid peach with white. Fails contrast (1.5 : 1); shown for reference only. */
+.btn-peach-white { background: var(--peach); color: #fff; box-shadow: none; font-weight: 600; }
+
+.btn-secondary { background: var(--night-overlay); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn-secondary:hover, .btn-secondary.is-hover { background: var(--night-hover); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.btn-secondary:active, .btn-secondary.is-active { background: var(--night-raised); }
+.btn-secondary:disabled, .btn-secondary.is-disabled { background: var(--night-raised); color: var(--ink-4); box-shadow: inset 0 0 0 1px var(--line-faint); }
+
+.btn-ghost { background: transparent; color: var(--ink-2); }
+.btn-ghost:hover, .btn-ghost.is-hover { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+.btn-ghost:active, .btn-ghost.is-active { background: rgba(255, 255, 255, 0.03); }
+.btn-ghost:disabled, .btn-ghost.is-disabled { background: transparent; color: var(--ink-4); }
+
+.btn-danger { background: var(--breach-wash); color: var(--breach); box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.28); }
+.btn-danger:hover, .btn-danger.is-hover { background: rgba(248, 113, 113, 0.2); }
+.btn-danger:active, .btn-danger.is-active { background: rgba(248, 113, 113, 0.14); }
+.btn-danger:disabled, .btn-danger.is-disabled { background: transparent; color: rgba(248, 113, 113, 0.4); box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.12); }
+
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin 700ms linear infinite; flex: none; opacity: 0.85;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Fields ---------- */
+.field {
+  --fr-r: var(--r-control);
+  position: relative;
+  height: var(--h-control);
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 0 10px;
+  background: var(--night-inset);
+  border-radius: var(--r-control);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-3);
+  transition: box-shadow var(--d-ui) var(--ease-out);
+  min-width: 0;
+}
+.field:hover, .field.is-hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.field input {
+  flex: 1; min-width: 0; height: 100%;
+  border: 0; outline: 0; background: transparent;
+  font-size: var(--t-13); color: var(--ink);
+}
+.field input::placeholder { color: var(--ink-3); }
+.field.is-error { box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.55); }
+.field.is-disabled { background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line-faint); color: var(--ink-4); }
+.field.is-disabled input { color: var(--ink-4); cursor: not-allowed; }
+.field.is-disabled input::placeholder { color: var(--ink-4); }
+.field .suffix { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3); }
+.kbd {
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-3);
+  min-width: 20px; height: 20px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-xs); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--night-raised);
+}
+.field-label { display: block; font-size: var(--t-12); font-weight: 500; color: var(--ink-2); margin-bottom: 6px; }
+.field-help { font-size: var(--t-12); color: var(--ink-3); margin-top: 6px; }
+.field-help.err { color: var(--breach); }
+
+.select-trigger {
+  --fr-r: var(--r-control);
+  height: var(--h-control);
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  padding: 0 8px 0 10px;
+  background: var(--night-inset);
+  border: 0; border-radius: var(--r-control);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--t-13); color: var(--ink);
+  transition: box-shadow var(--d-ui) var(--ease-out);
+}
+.select-trigger:hover, .select-trigger.is-hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.select-trigger .ph { color: var(--ink-3); }
+.select-trigger .i { color: var(--ink-3); margin-left: auto; }
+
+/* ---------- Checkbox / Switch / Radio ---------- */
+.check { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--t-13); color: var(--ink-2); cursor: pointer; position: relative; }
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.box {
+  --fr-r: var(--r-xs);
+  position: relative; flex: none;
+  width: 16px; height: 16px; border-radius: var(--r-xs);
+  background: var(--night-inset);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  display: grid; place-items: center;
+  transition: background-color var(--d-ui) var(--ease-out), box-shadow var(--d-ui) var(--ease-out);
+}
+.box::before { content: ""; position: absolute; inset: -12px; } /* 40px hit area */
+.box svg { width: 12px; height: 12px; stroke: var(--on-toggle); stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(0.9); transition: opacity var(--d-press) var(--ease-out), transform var(--d-press) var(--ease-out); }
+.check:hover .box, .box.is-hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+.check input:checked + .box, .box.is-on, .box.is-mixed { background: var(--toggle); box-shadow: none; }
+.check input:checked + .box svg, .box.is-on svg { opacity: 1; transform: none; }
+.box.is-mixed::after { content: ""; width: 8px; height: 2px; border-radius: 1px; background: var(--on-toggle); }
+.box.is-disabled { background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.box.is-disabled.is-on { background: var(--toggle-wash); }
+
+.switch {
+  --fr-r: var(--r-pill);
+  position: relative; flex: none;
+  width: 32px; height: 18px; border-radius: var(--r-pill); border: 0; padding: 0;
+  background: var(--night-hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: background-color var(--d-ui) var(--ease-out), box-shadow var(--d-ui) var(--ease-out);
+}
+.switch::before { content: ""; position: absolute; inset: -11px -6px; } /* 40px hit area */
+.switch .knob {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ink-2);
+  transition: transform var(--d-ui) var(--ease-out), background-color var(--d-ui) var(--ease-out);
+}
+.switch[aria-checked="true"] { background: var(--toggle); box-shadow: none; }
+.switch[aria-checked="true"] .knob { transform: translateX(14px); background: var(--on-toggle); }
+.switch:disabled { cursor: not-allowed; background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.switch:disabled .knob { background: var(--ink-4); }
+.switch[aria-checked="true"]:disabled { background: var(--toggle-wash); }
+.switch[aria-checked="true"]:disabled .knob { background: rgba(20, 7, 15, 0.6); }
+
+.radio { width: 16px; height: 16px; border-radius: 50%; background: var(--night-inset); box-shadow: inset 0 0 0 1px var(--line-strong); display: grid; place-items: center; flex: none; }
+.radio.is-on { box-shadow: inset 0 0 0 1px var(--toggle); }
+.radio.is-on::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--toggle); }
+
+/* ---------- Tabs & segmented ---------- */
+.tabs { display: flex; gap: var(--s-5); border-bottom: 1px solid var(--line-faint); }
+.tab {
+  --fr-r: var(--r-xs);
+  position: relative;
+  height: 36px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0; border: 0; background: none;
+  font-size: var(--t-13); font-weight: 500; color: var(--ink-3);
+  transition: color var(--d-ui) var(--ease-out);
+}
+.tab { border-radius: var(--r-xs); }
+.tab:focus-visible::after, .tab.is-focus::after { inset: 6px -6px; border-radius: var(--r-xs); }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab[aria-selected="true"]::before { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--toggle); }
+.tab .count { font-size: var(--t-11); font-variant-numeric: tabular-nums; color: var(--ink-3); height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: var(--r-pill); background: rgba(255, 255, 255, 0.06); }
+.tab[aria-selected="true"] .count { color: var(--here); background: var(--here-wash); }
+
+.seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--r-control); background: var(--night-inset); box-shadow: inset 0 0 0 1px var(--line); }
+.seg button {
+  --fr-r: var(--r-xs);
+  height: var(--h-control-sm); padding: 0 10px; border: 0; border-radius: var(--r-xs);
+  background: transparent; color: var(--ink-3); font-size: var(--t-12); font-weight: 500;
+  transition: background-color var(--d-ui) var(--ease-out), color var(--d-ui) var(--ease-out);
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--night-overlay); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ---------- Status pill ---------- */
+.pill {
+  height: 20px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 8px 0 7px; border-radius: var(--r-pill);
+  font-size: var(--t-12); font-weight: 500; line-height: 1; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.05); color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-faint);
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.pill.no-dot::before { display: none; }
+.pill.no-dot { padding: 0 8px; }
+.pill-ok      { color: var(--ok);      background: var(--ok-wash);      box-shadow: none; }
+.pill-caution { color: var(--caution); background: var(--caution-wash); box-shadow: none; }
+.pill-breach  { color: var(--breach);  background: var(--breach-wash);  box-shadow: none; }
+.pill-info    { color: var(--info);    background: var(--info-wash);    box-shadow: none; }
+.pill-unset   { color: var(--unset);   background: var(--unset-wash);   box-shadow: none; }
+.pill-muted   { color: var(--ink-3); }
+.pill-muted::before { background: var(--ink-4); }
+.tag { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--r-xs); font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ---------- Live dot & freshness ---------- */
+.live {
+  position: relative; width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--trail);
+}
+.live::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 102, 203, 0.55) 0%, rgba(245, 207, 141, 0) 70%);
+  animation: breathe 2.4s var(--ease-move) infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: 0.25; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.35); } }
+.live-badge {
+  height: 22px; display: inline-flex; align-items: center; gap: 7px; padding: 0 9px 0 8px;
+  border-radius: var(--r-pill); font-size: var(--t-12); font-weight: 600; color: var(--ink);
+  position: relative; background: var(--night-canvas);
+}
+.live-badge::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: var(--hair); background: var(--trail);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.fresh { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-12); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fresh .ticks { display: inline-flex; gap: 2px; align-items: flex-end; }
+.fresh .ticks i { width: 3px; border-radius: 1px; background: rgba(255, 255, 255, 0.12); }
+.fresh .ticks i:nth-child(1) { height: 5px; }
+.fresh .ticks i:nth-child(2) { height: 8px; }
+.fresh .ticks i:nth-child(3) { height: 11px; }
+.fresh.f-live .ticks i { background: var(--trail-v); }
+.fresh.f-live { color: var(--ink); }
+.fresh.f-recent .ticks i:nth-child(-n+2) { background: var(--ok); }
+.fresh.f-stale .ticks i:nth-child(1) { background: var(--caution); }
+.fresh.f-stale { color: var(--caution); }
+.fresh.f-off { color: var(--ink-3); }
+.fresh-scale { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
+.fresh-scale .panel { padding: var(--s-4); display: flex; flex-direction: column; gap: 10px; }
+.fresh-scale .note { margin: 0; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 232px; flex: none;
+  display: flex; flex-direction: column; gap: var(--s-1);
+  padding: var(--s-3) var(--s-2);
+  background: var(--night-canvas);
+  border-right: 1px solid var(--line-faint);
+}
+.sb-brand { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 10px; margin-bottom: var(--s-2); }
+.sb-brand .wm { height: 12px; width: auto; color: var(--ink); }
+.sb-brand .em { height: 22px; width: auto; display: none; }
+.sb-group { padding: var(--s-3) 10px 6px; }
+.nav-item {
+  --fr-r: var(--r-control);
+  position: relative;
+  height: 32px; display: flex; align-items: center; gap: 10px;
+  padding: 0 10px; border-radius: var(--r-control);
+  color: var(--ink-2); font-size: var(--t-13); font-weight: 500; text-decoration: none;
+  transition: background-color var(--d-ui) var(--ease-out), color var(--d-ui) var(--ease-out);
+}
+.nav-item .i { color: var(--ink-3); transition: color var(--d-ui) var(--ease-out); }
+.nav-item:hover, .nav-item.is-hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
+.nav-item:hover .i, .nav-item.is-hover .i { color: var(--ink-2); }
+.nav-item[aria-current="page"] { background: var(--here-wash); color: var(--here); }
+.nav-item[aria-current="page"] .i { color: var(--here); }
+.nav-item[aria-current="page"]::before {
+  content: ""; position: absolute; left: -8px; top: 7px; bottom: 7px; width: var(--edge);
+  border-radius: 0 1px 1px 0; background: var(--trail-v);
+}
+.nav-item .nav-count { margin-left: auto; font-size: var(--t-11); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.nav-item[aria-current="page"] .nav-count { color: var(--here); opacity: 0.8; }
+.nav-item .nav-alert { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill); display: inline-flex; align-items: center; justify-content: center; font-size: var(--t-11); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--breach); background: var(--breach-wash); }
+.sb-foot { display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid var(--line-faint); }
+.avatar { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: var(--t-11); font-weight: 600; color: var(--on-trail); background: var(--trail); }
+.avatar.plain { background: var(--night-hover); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+.sb-foot .who { min-width: 0; line-height: 1.3; }
+.sb-foot .who b { display: block; font-size: var(--t-13); font-weight: 500; }
+.sb-foot .who span { display: block; font-size: var(--t-11); color: var(--ink-3); }
+
+.sidebar.is-collapsed { width: 56px; align-items: center; }
+.sidebar.is-collapsed .sb-brand { padding: 0; justify-content: center; }
+.sidebar.is-collapsed .sb-brand .wm, .sidebar.is-collapsed .sb-brand .btn { display: none; }
+.sidebar.is-collapsed .sb-brand .em { display: block; }
+.sidebar.is-collapsed .sb-group { height: 1px; padding: 0; width: 20px; background: var(--line-faint); margin: 10px 0; }
+.sidebar.is-collapsed .sb-group span { display: none; }
+.sidebar.is-collapsed .nav-item { width: 36px; padding: 0; justify-content: center; }
+.sidebar.is-collapsed .nav-item .t, .sidebar.is-collapsed .nav-item .nav-count { display: none; }
+.sidebar.is-collapsed .nav-item .nav-alert { position: absolute; top: 3px; right: 2px; min-width: 7px; width: 7px; height: 7px; padding: 0; font-size: 0; background: var(--breach); }
+.sidebar.is-collapsed .nav-item[aria-current="page"]::before { left: -10px; }
+.sidebar.is-collapsed .sb-foot { padding: 10px 0 0; justify-content: center; }
+.sidebar.is-collapsed .sb-foot .who { display: none; }
+
+/* ---------- Table ---------- */
+.tbl-wrap { border-radius: var(--r-card); box-shadow: inset 0 0 0 1px var(--line-faint); overflow: hidden; background: var(--night-canvas); }
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--t-13); }
+.tbl th {
+  height: 32px; padding: 0 var(--s-3); text-align: left; white-space: nowrap;
+  font-size: var(--t-11); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
+  background: var(--night-raised); border-bottom: 1px solid var(--line-faint);
+  position: sticky; top: 0; z-index: 1;
+}
+.tbl th.sorted { color: var(--ink); }
+.tbl th .th-in { display: inline-flex; align-items: center; gap: 4px; }
+.tbl th .i-sm { color: var(--ink-3); }
+.tbl th.sorted .i-sm { color: var(--act); }
+.tbl td { height: var(--h-row); padding: 0 var(--s-3); border-bottom: 1px solid var(--line-faint); white-space: nowrap; color: var(--ink-2); }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .c-check { width: 40px; padding-right: 0; }
+.tbl .c-num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl .c-act { width: 44px; text-align: right; padding-right: 6px; }
+.tbl .primary-cell { color: var(--ink); font-weight: 500; }
+.tbl .sub-cell { color: var(--ink-3); font-size: var(--t-12); margin-left: 6px; }
+.tbl tbody tr { transition: background-color var(--d-ui) var(--ease-out); }
+.tbl tbody tr:hover, .tbl tbody tr.is-hover { background: rgba(255, 255, 255, 0.025); }
+.tbl tbody tr.is-selected { background: var(--here-wash); }
+.tbl tbody tr.is-selected td:first-child { box-shadow: inset 2px 0 0 0 transparent; background-image: var(--trail-v); background-size: var(--edge) 100%; background-repeat: no-repeat; }
+.tbl tbody tr.is-selected .primary-cell { color: var(--here); }
+.row-act { opacity: 0; transition: opacity var(--d-ui) var(--ease-out); }
+.tbl tbody tr:hover .row-act, .tbl tbody tr.is-hover .row-act, .tbl tbody tr.is-selected .row-act { opacity: 1; }
+.cell-with-av { display: inline-flex; align-items: center; gap: 8px; }
+.cell-with-av .avatar { width: 20px; height: 20px; font-size: 9px; }
+
+.tbl-foot { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s-3); border-top: 1px solid var(--line-faint); background: var(--night-canvas); font-size: var(--t-12); color: var(--ink-3); }
+.pager { display: flex; align-items: center; gap: 2px; }
+.pager .pg {
+  --fr-r: var(--r-control);
+  min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: var(--r-control);
+  background: transparent; color: var(--ink-3); font-size: var(--t-12); font-variant-numeric: tabular-nums;
+  transition: background-color var(--d-ui) var(--ease-out), color var(--d-ui) var(--ease-out);
+}
+.pager .pg:hover { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+.pager .pg[aria-current="page"] { background: var(--night-overlay); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.pager .pg:disabled { color: var(--ink-4); background: none; cursor: not-allowed; }
+
+.bulk {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  height: 44px; padding: 0 6px 0 var(--s-2);
+  background: var(--night-overlay); border-radius: var(--r-card); box-shadow: var(--shadow-overlay);
+}
+.bulk .n { display: inline-flex; align-items: center; gap: 8px; padding: 0 var(--s-2) 0 4px; font-size: var(--t-13); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bulk .n b { color: var(--here); font-weight: 600; }
+.bulk .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+
+/* ---------- Stat block ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: var(--r-card); box-shadow: inset 0 0 0 1px var(--line-faint); background: var(--night-raised); }
+.stat { padding: var(--s-4) var(--s-4) 14px; border-left: 1px solid var(--line-faint); min-width: 0; }
+.stat:first-child { border-left: 0; }
+.stat .v { margin-top: 6px; font-size: var(--t-23); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--ink); display: flex; align-items: baseline; gap: 4px; }
+.stat .v small { font-size: var(--t-13); font-weight: 500; color: var(--ink-3); letter-spacing: 0; }
+.stat .d { margin-top: 6px; font-size: var(--t-12); color: var(--ink-3); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .d .up { color: var(--ok); font-weight: 500; }
+.stat .d .down { color: var(--caution); font-weight: 500; }
+.stat .meter { margin-top: 10px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.stat .meter i { display: block; height: 100%; border-radius: 2px; }
+
+/* ---------- Menu / dialog / tooltip / toast ---------- */
+.menu {
+  width: 224px; padding: 4px;
+  background: var(--night-overlay); border-radius: var(--r-card); box-shadow: var(--shadow-overlay);
+  transform-origin: top left;
+}
+.menu-item {
+  --fr-r: var(--r-xs);
+  width: 100%; height: 30px; display: flex; align-items: center; gap: 10px;
+  padding: 0 8px; border: 0; border-radius: var(--r-xs);
+  background: transparent; color: var(--ink-2); font-size: var(--t-13); text-align: left;
+}
+.menu-item .i { color: var(--ink-3); }
+.menu-item:hover, .menu-item.is-hover { background: var(--night-hover); color: var(--ink); }
+.menu-item:hover .i, .menu-item.is-hover .i { color: var(--ink-2); }
+.menu-item .kbd { margin-left: auto; background: transparent; box-shadow: none; }
+.menu-item.danger { color: var(--breach); }
+.menu-item.danger .i { color: var(--breach); }
+.menu-item.danger:hover { background: var(--breach-wash); }
+.menu-sep { height: 1px; background: var(--line-faint); margin: 4px -4px; }
+.menu-label { padding: 6px 8px 4px; }
+
+.dialog {
+  width: 100%; max-width: 420px;
+  background: var(--night-overlay); border-radius: var(--r-dialog); box-shadow: var(--shadow-overlay);
+}
+.dialog-body { padding: var(--s-5) var(--s-5) var(--s-4); }
+.dialog h4 { font-size: var(--t-16); font-weight: 600; letter-spacing: -0.01em; }
+.dialog p { margin-top: 6px; font-size: var(--t-13); color: var(--ink-2); line-height: 1.55; text-wrap: pretty; }
+.dialog .confirm { margin-top: var(--s-4); }
+.dialog-foot { display: flex; justify-content: flex-end; gap: var(--s-2); padding: var(--s-3) var(--s-5); border-top: 1px solid var(--line-faint); }
+.scrim-demo { min-width: 0; padding: var(--s-8); border-radius: var(--r-card); background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.015) 0 10px, transparent 10px 20px), rgba(0, 0, 0, 0.55); box-shadow: inset 0 0 0 1px var(--line-faint); display: grid; grid-template-columns: minmax(0, 420px); justify-content: center; align-items: center; }
+
+.tooltip {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 26px; padding: 0 8px; border-radius: var(--r-control);
+  background: #F4F4F6; color: #0B0B0F; font-size: var(--t-12); font-weight: 500;
+}
+.tooltip .kbd { background: rgba(0, 0, 0, 0.06); box-shadow: none; color: #3A3A42; height: 18px; }
+
+.toast {
+  width: 340px; display: flex; gap: var(--s-3); align-items: flex-start;
+  padding: var(--s-3) var(--s-3) var(--s-3) 14px;
+  background: var(--night-overlay); border-radius: var(--r-card); box-shadow: var(--shadow-overlay);
+}
+.toast .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; margin-top: 1px; }
+.toast .ic .i { width: 12px; height: 12px; stroke-width: 2.5; }
+.toast b { display: block; font-size: var(--t-13); font-weight: 600; }
+.toast p { font-size: var(--t-12); color: var(--ink-3); margin-top: 2px; }
+.toast .btn { margin-left: auto; }
+
+/* ---------- Empty / error / skeleton ---------- */
+.states3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.state-card { padding: var(--s-8) var(--s-6); display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 250px; justify-content: center; }
+.state-card h4 { font-size: var(--t-14); font-weight: 600; margin-top: var(--s-4); }
+.state-card p { font-size: var(--t-13); color: var(--ink-3); margin-top: 4px; max-width: 30ch; text-wrap: pretty; }
+.state-card .btn { margin-top: var(--s-4); }
+.empty-glyph { width: 64px; height: 64px; position: relative; display: grid; place-items: center; }
+.empty-glyph svg { width: 64px; height: 64px; }
+.err-glyph { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--breach-wash); color: var(--breach); }
+.skel { border-radius: var(--r-xs); background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.09) 40%, rgba(255, 255, 255, 0.04) 80%); background-size: 240% 100%; animation: shimmer 1.6s linear infinite; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -140% 0; } }
+.skel-rows { width: 100%; display: grid; gap: 14px; }
+.skel-row { display: grid; grid-template-columns: 16px 1fr 64px 48px; gap: var(--s-3); align-items: center; }
+
+/* ==========================================================================
+   Sample screens
+   ========================================================================== */
+.screen {
+  display: flex; height: 780px;
+  border-radius: var(--r-dialog); overflow: hidden;
+  background: var(--night-canvas);
+  box-shadow: 0 0 0 1px var(--line), 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+}
+.screen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { height: 48px; flex: none; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border-bottom: 1px solid var(--line-faint); }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: var(--t-13); color: var(--ink-3); min-width: 0; }
+.crumbs .i-sm { color: var(--ink-4); }
+.crumbs b { color: var(--ink); font-weight: 500; }
+.topbar .search { width: 260px; margin-left: auto; }
+.page { flex: 1; min-height: 0; overflow: hidden; padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-4); }
+.page-head h2 { font-size: var(--t-19); font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; }
+.page-head p { font-size: var(--t-13); color: var(--ink-3); margin-top: 2px; }
+.toolbar { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.chip {
+  --fr-r: var(--r-control);
+  height: var(--h-control-sm); display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 10px; border: 0; border-radius: var(--r-control);
+  background: transparent; color: var(--ink-2); font-size: var(--t-12); font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--line); border-style: dashed;
+  transition: background-color var(--d-ui) var(--ease-out);
+}
+.chip:hover { background: rgba(255, 255, 255, 0.04); }
+.chip .i-sm { color: var(--ink-3); }
+.chip.on { box-shadow: inset 0 0 0 1px var(--line-strong); background: var(--night-raised); color: var(--ink); }
+.chip.on .val { color: var(--act); }
+.chip .x { color: var(--ink-3); margin-left: 2px; }
+.page .tbl-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.page .tbl-scroll { flex: 1; min-height: 0; overflow: hidden; }
+.bulk-float { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); }
+
+/* Detail */
+.detail-head { display: flex; align-items: flex-start; gap: var(--s-4); }
+.device-glyph { width: 44px; height: 44px; border-radius: var(--r-card); flex: none; display: grid; place-items: center; background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); }
+.detail-head h2 { font-size: var(--t-19); font-weight: 600; letter-spacing: -0.015em; display: flex; align-items: center; gap: var(--s-3); }
+.detail-meta { display: flex; align-items: center; gap: var(--s-3); margin-top: 6px; font-size: var(--t-12); color: var(--ink-3); flex-wrap: wrap; }
+.detail-meta .dotsep { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); }
+.detail-actions { margin-left: auto; display: flex; gap: var(--s-2); }
+.detail-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--s-4); }
+.map {
+  position: relative; border-radius: var(--r-card); overflow: hidden; min-height: 0;
+  background: #0A0A0D; box-shadow: inset 0 0 0 1px var(--line-faint);
+}
+.map svg.base { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-chip { position: absolute; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: var(--r-control); background: rgba(21, 21, 26, 0.92); backdrop-filter: blur(8px); box-shadow: 0 0 0 1px var(--line); font-size: var(--t-12); color: var(--ink-2); }
+.map-chip b { color: var(--ink); font-weight: 500; }
+.map-ctrl { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; border-radius: var(--r-control); box-shadow: 0 0 0 1px var(--line); }
+.map-ctrl button:first-child { border-radius: var(--r-control) var(--r-control) 0 0; }
+.map-ctrl button:last-child { border-radius: 0 0 var(--r-control) var(--r-control); }
+.map-ctrl button { width: 30px; height: 30px; border: 0; background: rgba(21, 21, 26, 0.92); color: var(--ink-2); display: grid; place-items: center; }
+.map-ctrl button + button { border-top: 1px solid var(--line-faint); }
+.pin { position: absolute; transform: translate(-50%, -50%); width: 34px; height: 34px; }
+.pin::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 102, 203, 0.35), rgba(255, 102, 203, 0) 70%); animation: breathe 2.4s var(--ease-move) infinite; }
+.pin .av { position: absolute; inset: 0; border-radius: 50%; padding: 1px; background: var(--trail); }
+.pin .av span { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; background: var(--night-overlay); font-size: var(--t-11); font-weight: 600; color: var(--ink); }
+.side-col { display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; }
+.side-card { border-radius: var(--r-card); box-shadow: inset 0 0 0 1px var(--line-faint); background: var(--night-raised); }
+.side-card .hd { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s-4); border-bottom: 1px solid var(--line-faint); }
+.side-card .hd b { font-size: var(--t-13); font-weight: 600; }
+.kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px var(--s-3); padding: var(--s-4); font-size: var(--t-13); }
+.kv dt { color: var(--ink-3); }
+.kv dd { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.kv dd .mono { font-size: var(--t-12); }
+.kv dd a { color: var(--act); text-decoration: none; }
+.kv dd a:hover { color: var(--act-hover); text-decoration: underline; text-underline-offset: 3px; }
+.timeline { padding: 6px 0 var(--s-2); flex: 1; min-height: 0; overflow: hidden; }
+.tl-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; padding: 7px var(--s-4); position: relative; }
+.tl-item::before { content: ""; position: absolute; left: calc(var(--s-4) + 9px); top: 22px; bottom: -8px; width: 1px; background: var(--line); }
+.tl-item:last-child::before { display: none; }
+.tl-dot { width: 20px; height: 20px; display: grid; place-items: center; }
+.tl-dot i { display: block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 3px var(--night-raised); }
+.tl-item b { display: block; font-size: var(--t-13); font-weight: 500; color: var(--ink); line-height: 1.35; }
+.tl-item span { display: block; font-size: var(--t-12); color: var(--ink-3); line-height: 1.4; }
+.tl-item time { font-size: var(--t-11); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+
+/* ---------- Footer / reduced motion / responsive ---------- */
+.doc-foot { margin-top: 120px; padding-top: var(--s-6); border-top: 1px solid var(--line-faint); display: flex; justify-content: space-between; color: var(--ink-3); font-size: var(--t-12); }
+.link { color: var(--act); text-decoration: none; font-weight: 500; }
+.link:hover { color: var(--act-hover); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .live::after, .pin::before { opacity: 0.6; transform: none; }
+  html { scroll-behavior: auto; }
+}
+
+@media (max-width: 1100px) {
+  .brand-grid, .role-pair, .role-triple, .foundations, .usage, .experiment { grid-template-columns: 1fr; }
+  .surface-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mono-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .states3, .tiers, .fresh-scale { grid-template-columns: 1fr 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-grid .side-col { display: none; }
+  .hide-md { display: none; }
+}
+@media (max-width: 760px) {
+  .doc { padding: 0 var(--s-4) 120px; }
+  .doc-top { padding: 0 var(--s-4); }
+  .doc-nav { display: none; }
+  .hero { padding-top: 56px; }
+  .hero h1 { font-size: 40px; }
+  .principles { grid-template-columns: 1fr; }
+  .sec-head { grid-template-columns: 1fr; }
+  .sec-lede { grid-column: 1; }
+  .ink-row { grid-template-columns: 90px minmax(0, 1fr); }
+  .ink-row .ratio, .ink-row .grade { display: none; }
+  .type-row { grid-template-columns: 90px minmax(0, 1fr); }
+  .type-row .use { display: none; }
+  .states3, .tiers, .fresh-scale, .stats { grid-template-columns: 1fr; }
+  .stat { border-left: 0; border-top: 1px solid var(--line-faint); }
+  .stat:first-child { border-top: 0; }
+  .overlay-grid { grid-template-columns: minmax(0, 1fr); }
+  .scrim-demo { padding: var(--s-3); }
+  .toast { width: 100%; }
+  .tabs { overflow-x: auto; scrollbar-width: none; }
+  .tabs .tab { flex: none; }
+  .screen .sidebar { display: none; }
+  .screen { height: auto; min-height: 640px; }
+  .topbar .search { display: none; }
+}
+</style>
+<style>
+/* QA mockup additions on top of the Night Trail reference stylesheet.
+   Only tokens from design-system.html are used. */
+body { padding: 20px; }
+.mock-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.mock-nav .t { font-size: var(--t-12); color: var(--ink-3); margin-right: 6px; }
+.mock-nav .wm { height: 11px; width: auto; color: var(--ink); margin-right: 10px; }
+.mock-nav button { height: 26px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink-3); font-size: var(--t-12); font-weight: 500; box-shadow: inset 0 0 0 1px var(--line); }
+.mock-nav button:hover { color: var(--ink); background: rgba(255,255,255,.04); }
+.mock-nav button[aria-pressed="true"] { color: var(--here); background: var(--here-wash); box-shadow: inset 0 0 0 1px rgba(245,207,141,.35); }
+
+.app.screen { height: 900px; position: relative; }
+.app .page { overflow-y: auto; padding-bottom: 48px; }
+.app .page > * { flex: none; }
+.app .sidebar { overflow-y: auto; }
+
+/* Collapsible sub-menu, as in nav-group.tsx */
+.nav-item .chev { margin-left: auto; color: var(--ink-3); transform: rotate(90deg); }
+.nav-item.is-open { color: var(--ink); }
+.nav-item.is-open > .i:first-child { color: var(--ink-2); }
+.nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 17px; padding-left: 9px; border-left: 1px solid var(--line-faint); }
+.nav-sub .nav-item { height: 28px; gap: 8px; padding: 0 8px; font-weight: 450; }
+.nav-sub .nav-item .i { width: 14px; height: 14px; }
+.nav-sub .nav-item[aria-current="page"]::before { left: -10px; top: 6px; bottom: 6px; }
+.sidebar.is-collapsed .nav-item .chev { display: none; }
+.sidebar.is-collapsed .nav-sub { margin: 0; padding: 0; border: 0; align-items: center; }
+.sidebar.is-collapsed .nav-sub .nav-item { width: 36px; height: 30px; justify-content: center; padding: 0; }
+.sidebar.is-collapsed .nav-sub .nav-item .i { width: 15px; height: 15px; }
+.sidebar.is-collapsed .nav-sub .nav-item[aria-current="page"]::before { left: -10px; }
+.sidebar.is-collapsed .nav-item.qa-root { display: none; }
+
+/* Layout helpers */
+.grid2 { display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr); }
+.grid-bench { display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--s-3); min-width: 0; }
+@container main (min-width: 900px) {
+  .grid2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .grid2.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .grid2.side { grid-template-columns: 260px minmax(0, 1fr); }
+  .grid2.detail { grid-template-columns: minmax(0, 1fr) 300px; }
+  .grid-bench { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+.screen-main { container-type: inline-size; container-name: main; position: relative; }
+.page-head { flex-wrap: wrap; }
+.page-head .acts { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
+.detail-head { flex-wrap: wrap; }
+
+/* Panel with a header */
+.pn { border-radius: var(--r-card); box-shadow: inset 0 0 0 1px var(--line-faint); background: var(--night-raised); min-width: 0; }
+.pn > .hd { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: 10px var(--s-4); border-bottom: 1px solid var(--line-faint); flex-wrap: wrap; }
+.pn > .hd b { font-size: var(--t-13); font-weight: 600; }
+.pn > .hd .sub2 { font-size: var(--t-12); color: var(--ink-3); margin-left: 8px; font-weight: 400; }
+.pn > .bd { padding: var(--s-4); }
+.pn > .bd.flush { padding: 0; }
+.side-card .bd { padding: var(--s-4); }
+
+/* Stat strips with more than four items */
+.stats.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.stats.n6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.stats.n8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.stats .stat.click { cursor: pointer; transition: background-color var(--d-ui) var(--ease-out); }
+.stats .stat.click:hover { background: rgba(255,255,255,.025); }
+.stat .v.sm { font-size: var(--t-16); }
+.stat .label .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+@container main (max-width: 1080px) {
+  .stats.n8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stats.n8 .stat:nth-child(n+5) { border-top: 1px solid var(--line-faint); }
+  .stats.n8 .stat:nth-child(5) { border-left: 0; }
+  .stats.n6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stats.n6 .stat:nth-child(n+4) { border-top: 1px solid var(--line-faint); }
+  .stats.n6 .stat:nth-child(4) { border-left: 0; }
+}
+@container main (max-width: 640px) {
+  .stats, .stats.n3, .stats.n5, .stats.n6, .stats.n8 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats .stat { border-top: 1px solid var(--line-faint); }
+  .stats .stat:nth-child(odd) { border-left: 0; }
+  .stats .stat:nth-child(-n+2) { border-top: 0; }
+  .topbar .search { display: none; }
+  .page { padding: var(--s-4); }
+}
+.tbl-scroll { overflow-x: auto !important; }
+.tbl tbody tr.click { cursor: pointer; }
+.tbl td.wrap { white-space: normal; }
+.tbl .c-check .box { cursor: pointer; }
+
+/* Stage rail: done = ok, here = trail ring, failed = breach */
+.rail { display: flex; list-style: none; overflow-x: auto; scrollbar-width: none; padding: 4px 2px 2px; }
+.rail li { flex: 1 0 84px; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.rail li + li::before { content: ""; position: absolute; top: 11px; right: calc(50% + 15px); left: calc(-50% + 15px); height: 1px; background: var(--line); }
+.rail li.done::before { background: rgba(74, 222, 128, .45); }
+.rail li.here::before, .rail li.fail::before { background: var(--trail); }
+.rail .node { position: relative; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--t-11); font-weight: 600; font-variant-numeric: tabular-nums; background: var(--night-inset); color: var(--ink-4); box-shadow: inset 0 0 0 1px var(--line); }
+.rail .node .i { width: 12px; height: 12px; stroke-width: 2.5; }
+.rail li.done .node { background: var(--ok-wash); color: var(--ok); box-shadow: none; }
+.rail li.fail .node { background: var(--breach-wash); color: var(--breach); box-shadow: 0 0 0 4px rgba(248,113,113,.08); }
+.rail li.here .node { background: var(--night-canvas); color: var(--here); box-shadow: var(--focus-glow); }
+.rail li.here .node::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--trail); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.rail .nm { font-size: var(--t-12); font-weight: 500; color: var(--ink-2); line-height: 1.25; }
+.rail li.todo .nm { color: var(--ink-3); font-weight: 400; }
+.rail li.here .nm { color: var(--here); }
+.rail li.fail .nm { color: var(--breach); }
+.rail .tm { font-size: var(--t-11); color: var(--ink-3); font-variant-numeric: tabular-nums; min-height: 14px; }
+.rail.compact li { flex-basis: 58px; }
+.rail.compact .nm { font-size: var(--t-11); }
+
+.mini { display: inline-flex; gap: 2px; vertical-align: middle; }
+.mini i { width: 7px; height: 4px; border-radius: 1px; background: rgba(255,255,255,.09); }
+.mini i.done { background: rgba(74, 222, 128, .6); }
+.mini i.here { background: var(--trail); }
+.mini i.fail { background: var(--breach); }
+.stage-cell { display: inline-flex; align-items: center; gap: 10px; }
+.stage-cell .nm { color: var(--ink-2); }
+
+/* Result marks: always icon + word */
+.rk { display: inline-flex; align-items: center; gap: 6px; }
+.rk .i { width: 13px; height: 13px; stroke-width: 2.25; }
+.rk.pass { color: var(--ok); }
+.rk.fail { color: var(--breach); }
+.rk.run { color: var(--ink); }
+.rk.skip { color: var(--ink-3); }
+.rk .w { color: var(--ink-2); }
+
+/* Bars */
+.bars-v { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 150px; border-bottom: 1px solid var(--line-faint); }
+.bars-v .gl { position: absolute; left: 0; right: 0; height: 1px; background: var(--line-faint); }
+.bars-v .gl span { position: absolute; left: -24px; top: -7px; font-size: var(--t-11); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bars-v .b { flex: 1; height: 100%; position: relative; display: flex; align-items: flex-end; }
+.bars-v .b > i { display: block; width: 100%; height: var(--h); min-height: 2px; border-radius: 4px 4px 0 0; background: var(--pink); opacity: .85; transition: opacity var(--d-ui) var(--ease-out); }
+.bars-v .b:hover > i { opacity: 1; }
+.bars-v .tip { position: absolute; bottom: calc(var(--h) + 6px); left: 50%; transform: translateX(-50%); z-index: 2; opacity: 0; pointer-events: none; transition: opacity var(--d-ui) var(--ease-out); }
+.bars-v .b:hover .tip { opacity: 1; }
+.bars-x { display: flex; gap: 4px; margin-top: 6px; }
+.bars-x span { flex: 1; text-align: center; font-size: var(--t-11); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hbars { display: flex; flex-direction: column; gap: 2px; }
+.hb { display: grid; grid-template-columns: 132px minmax(0, 1fr) 44px; gap: var(--s-3); align-items: center; height: 30px; padding: 0 8px; border-radius: var(--r-control); cursor: pointer; transition: background-color var(--d-ui) var(--ease-out); }
+.hb:hover { background: rgba(255,255,255,.035); }
+.hb .l { display: flex; align-items: center; gap: 8px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb .tr { height: 6px; border-radius: 3px; background: rgba(255,255,255,.06); overflow: hidden; }
+.hb .tr i { display: block; height: 100%; border-radius: 3px; background: var(--pink); opacity: .85; }
+.hb.fail .tr i { background: var(--breach); }
+.hb.muted .tr i { background: var(--ink-3); }
+.hb .c { text-align: right; color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+.hsep { padding: 10px 8px 4px; }
+
+/* Lists */
+.lst { display: flex; flex-direction: column; }
+.lst .li { min-height: 36px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line-faint); color: var(--ink-2); }
+.lst .li:last-child { border-bottom: 0; }
+.lst .li .r { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.lst .li b { color: var(--ink); font-weight: 500; }
+
+/* Bench */
+.mock-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--r-card); box-shadow: inset 0 0 0 1px rgba(167,139,250,.35); background: repeating-linear-gradient(135deg, rgba(167,139,250,.04) 0 8px, transparent 8px 16px); font-size: var(--t-12); color: var(--ink-3); }
+.mock-bar b { color: var(--unset); font-weight: 600; }
+.mock-bar button { height: 24px; padding: 0 9px; border: 0; border-radius: var(--r-pill); background: var(--night-raised); color: var(--ink-2); font-size: var(--t-12); box-shadow: inset 0 0 0 1px var(--line); }
+.mock-bar button[aria-pressed="true"] { color: var(--here); background: var(--here-wash); box-shadow: inset 0 0 0 1px rgba(245,207,141,.35); }
+.unit-strip { display: flex; align-items: flex-start; gap: var(--s-3); flex-wrap: wrap; }
+.unit-strip h3 { font-size: var(--t-16); font-weight: 600; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.unit-strip .meta { margin-top: 4px; font-size: var(--t-12); color: var(--ink-3); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.unit-strip .meta .dotsep { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); }
+.unit-strip .btn { margin-left: auto; }
+.scan-field { height: 52px !important; padding: 0 6px 0 14px !important; }
+.scan-field input { font-size: var(--t-16) !important; font-family: var(--font-mono); }
+.scan-field .btn { height: 38px; }
+.or { display: flex; align-items: center; gap: 10px; font-size: var(--t-11); color: var(--ink-4); text-transform: uppercase; letter-spacing: .06em; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line-faint); }
+.detect { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--r-card); background: var(--info-wash); box-shadow: inset 0 0 0 1px rgba(96,165,250,.25); }
+.detect b { color: var(--info); display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.detect p { font-size: var(--t-12); color: var(--ink-2); margin-top: 3px; }
+.next { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5); border-radius: var(--r-card); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line); }
+.next h3 { font-size: var(--t-19); font-weight: 600; letter-spacing: -.015em; }
+.next .kv { padding: 0; grid-template-columns: 70px minmax(0, 1fr); }
+.btn.btn-lg { height: 40px; padding: 0 16px; font-size: var(--t-14); gap: 8px; }
+.btn .kbd { margin-left: 4px; height: 18px; min-width: 18px; background: transparent; }
+.btn-primary .kbd { color: var(--act); box-shadow: inset 0 0 0 1px var(--act-fill-line); }
+.prog { height: 6px; border-radius: 3px; background: rgba(255,255,255,.06); overflow: hidden; }
+.prog > i { display: block; height: 100%; border-radius: 3px; background: var(--trail); transition: width 120ms linear; }
+.prog.ok > i { background: var(--ok); }
+.prog.bad > i { background: var(--breach); }
+.phase-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.console { height: 190px; overflow-y: auto; padding: 12px 14px; border-radius: var(--r-card); background: var(--night-inset); box-shadow: inset 0 0 0 1px var(--line-faint); font-family: var(--font-mono); font-size: var(--t-12); line-height: 1.7; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; }
+.console .ok { color: var(--ok); } .console .er { color: var(--breach); } .console .dim { color: var(--ink-3); } .console .ag { color: var(--info); } .console .wa { color: var(--caution); }
+.tcards { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.tc { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--r-card); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line); }
+.tc.pass { background: var(--ok-wash); box-shadow: inset 0 0 0 1px rgba(74,222,128,.25); }
+.tc.fail { background: var(--breach-wash); box-shadow: inset 0 0 0 1px rgba(248,113,113,.28); }
+.tc.act { background: var(--caution-wash); box-shadow: inset 0 0 0 1px rgba(255,159,67,.3); }
+.tc .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tc .nm { display: flex; align-items: center; gap: 7px; font-weight: 600; color: var(--ink); }
+.tc .nm .i { color: var(--ink-3); }
+.tc .big { font-size: var(--t-28); font-weight: 600; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tc .big small { font-size: var(--t-13); color: var(--ink-3); font-weight: 500; letter-spacing: 0; }
+.tc .lim { font-size: var(--t-12); color: var(--ink-3); }
+.tc .instr { display: flex; align-items: center; gap: 6px; font-size: var(--t-12); font-weight: 600; color: var(--caution); }
+.result { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 28px 20px; border-radius: var(--r-card); }
+.result.pass { background: var(--ok-wash); box-shadow: inset 0 0 0 1px rgba(74,222,128,.25); }
+.result.fail { background: var(--breach-wash); box-shadow: inset 0 0 0 1px rgba(248,113,113,.28); }
+.result .circ { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; }
+.result.pass .circ { background: rgba(74,222,128,.18); color: var(--ok); }
+.result.fail .circ { background: rgba(248,113,113,.18); color: var(--breach); }
+.result .circ .i { width: 26px; height: 26px; stroke-width: 2.5; }
+.result .word { font-size: var(--t-28); font-weight: 700; letter-spacing: .08em; }
+.result.pass .word { color: var(--ok); } .result.fail .word { color: var(--breach); }
+.result .why { font-weight: 600; color: var(--ink); }
+.result .meta { font-size: var(--t-12); color: var(--ink-2); }
+.rlist { width: 100%; max-width: 460px; margin-top: 8px; display: grid; gap: 4px; text-align: left; }
+.rlist div { display: flex; justify-content: space-between; align-items: center; height: 34px; padding: 0 12px; border-radius: var(--r-control); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.rlist b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hw { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-control); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.hw .ico { width: 30px; height: 30px; border-radius: var(--r-control); display: grid; place-items: center; flex: none; background: var(--night-overlay); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+.hw .t { font-size: var(--t-13); font-weight: 500; color: var(--ink); }
+.hw .s { font-size: var(--t-12); color: var(--ink-3); }
+.hw .r { margin-left: auto; }
+.slots { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.slot { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--r-card); background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.slot.pass { box-shadow: inset 0 0 0 1px rgba(74,222,128,.3); }
+.slot.empty { align-items: center; justify-content: center; text-align: center; min-height: 170px; color: var(--ink-3); background: transparent; box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--r-card); }
+.slot .top { display: flex; align-items: center; justify-content: space-between; }
+.slot .top b { font-weight: 600; }
+.kbd-list .li { gap: 12px; }
+
+/* Flow */
+.phases { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); }
+.phase { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); border-radius: var(--r-card); background: var(--night-raised); box-shadow: inset 0 0 0 1px var(--line-faint); }
+.phase .no { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-4); }
+.phase h3 { font-size: var(--t-14); font-weight: 600; margin-top: 2px; }
+.phase .where { display: flex; flex-wrap: wrap; gap: 6px; }
+.phase ul { display: flex; flex-direction: column; gap: 10px; }
+.phase li { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 10px; }
+.phase li::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--trail); }
+.phase li b { display: block; font-size: var(--t-13); font-weight: 500; color: var(--ink); }
+.phase li span { display: block; font-size: var(--t-12); color: var(--ink-3); line-height: 1.45; }
+.link-tag { height: 22px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 0; border-radius: var(--r-pill); background: var(--here-wash); color: var(--act); font-size: var(--t-12); font-weight: 500; box-shadow: inset 0 0 0 1px rgba(245,207,141,.25); }
+.link-tag:hover { background: rgba(245,207,141,.12); }
+.link-tag .i { width: 12px; height: 12px; }
+.loop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loop .i.arrow { color: var(--ink-4); }
+.lbox { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; border-radius: var(--r-card); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line); }
+.lbox b { display: flex; align-items: center; gap: 6px; font-size: var(--t-13); font-weight: 500; color: var(--ink); }
+.lbox > span { display: block; font-size: var(--t-12); color: var(--ink-3); margin-top: 1px; }
+.steps { display: grid; gap: var(--s-2); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stepc { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 0; text-align: left; border-radius: var(--r-card); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow var(--d-ui) var(--ease-out), background-color var(--d-ui) var(--ease-out); }
+.stepc:hover { background: rgba(255,255,255,.025); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.stepc .n { font-family: var(--font-mono); font-size: var(--t-11); color: var(--ink-4); }
+.stepc b { display: flex; align-items: center; gap: 7px; font-size: var(--t-13); font-weight: 600; color: var(--ink); }
+.stepc b .i { color: var(--act); }
+.stepc > span { font-size: var(--t-12); color: var(--ink-3); line-height: 1.45; }
+
+/* Open questions: a mockup annotation, not product UI */
+.oq { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: var(--r-card); background: var(--unset-wash); box-shadow: inset 0 0 0 1px rgba(167,139,250,.32); font-size: var(--t-12); color: var(--ink-2); line-height: 1.5; }
+.oq .i { color: var(--unset); margin-top: 1px; width: 14px; height: 14px; }
+.oq b { color: var(--unset); font-weight: 600; }
+.insight { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: var(--r-card); background: var(--caution-wash); font-size: var(--t-12); color: var(--ink-2); line-height: 1.5; }
+.insight .i { color: var(--caution); margin-top: 1px; width: 14px; height: 14px; }
+.insight b { color: var(--caution); font-weight: 600; }
+
+/* Overlays */
+.scrim { position: absolute; inset: 0; z-index: 40; display: flex; background: rgba(0, 0, 0, .58); animation: fade var(--d-overlay) var(--ease-out); }
+.scrim .dialog { margin: auto; max-width: 480px; width: calc(100% - 32px); max-height: calc(100% - 48px); overflow-y: auto; animation: pop var(--d-overlay) var(--ease-out); }
+.dialog .dialog-body { display: flex; flex-direction: column; gap: var(--s-4); }
+.dialog .dialog-body > p { margin-top: -10px; }
+.sheet { margin-left: auto; width: min(460px, 94%); height: 100%; display: flex; flex-direction: column; background: var(--night-overlay); box-shadow: var(--shadow-overlay); animation: slide var(--d-overlay) var(--ease-out); }
+.sheet .sh-h { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--line-faint); }
+.sheet .sh-h h4 { font-size: var(--t-16); font-weight: 600; display: flex; align-items: center; gap: var(--s-2); }
+.sheet .sh-h p { font-size: var(--t-12); color: var(--ink-3); margin-top: 4px; }
+.sheet .sh-b { flex: 1; overflow-y: auto; padding: var(--s-4) var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
+.sheet .sh-f { display: flex; justify-content: flex-end; gap: var(--s-2); padding: var(--s-3) var(--s-5); border-top: 1px solid var(--line-faint); flex-wrap: wrap; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(.96); } }
+@keyframes slide { from { opacity: 0; transform: translateX(24px); } }
+.fgrid { display: grid; gap: var(--s-3); grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px; border-radius: var(--r-card); text-align: center; font-size: var(--t-12); color: var(--ink-3); background: var(--night-inset); box-shadow: inset 0 0 0 1px var(--line); background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.015) 0 10px, transparent 10px 20px); }
+.drop b { color: var(--ink); font-size: var(--t-13); font-weight: 500; }
+.drop .i { color: var(--act); width: 20px; height: 20px; }
+.codeline { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 36px; padding: 0 6px 0 12px; border-radius: var(--r-control); background: var(--night-inset); box-shadow: inset 0 0 0 1px var(--line); font-family: var(--font-mono); font-size: var(--t-12); color: var(--ink); }
+.area { height: 72px !important; align-items: flex-start !important; padding-top: 8px !important; }
+.area span { color: var(--ink-3); }
+.field.val span.v { color: var(--ink); font-size: var(--t-13); }
+.empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 36px 16px; }
+.empty-state h4 { font-size: var(--t-14); font-weight: 600; margin-top: var(--s-3); }
+.empty-state p { font-size: var(--t-13); color: var(--ink-3); margin-top: 4px; max-width: 36ch; }
+.empty-state .ei { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--night-overlay); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+.suite-i { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 0; text-align: left; width: 100%; background: transparent; border-radius: var(--r-control); position: relative; }
+.suite-i:hover { background: rgba(255,255,255,.035); }
+.suite-i[aria-current="true"] { background: var(--here-wash); }
+.suite-i[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: var(--edge); background: var(--trail-v); border-radius: 1px; }
+.suite-i b { display: flex; justify-content: space-between; align-items: center; font-size: var(--t-13); font-weight: 500; color: var(--ink); }
+.suite-i[aria-current="true"] b { color: var(--here); }
+.suite-i > span { font-size: var(--t-12); color: var(--ink-3); }
+.thr { height: 28px !important; width: 170px; }
+.thr span { color: var(--ink); font-size: var(--t-12); font-family: var(--font-mono); }
+.timeline .tl-item time { font-variant-numeric: tabular-nums; }
+.tl-note { margin-top: 6px; padding: 8px 10px; border-radius: var(--r-control); background: var(--night-canvas); box-shadow: inset 0 0 0 1px var(--line-faint); font-size: var(--t-12); color: var(--ink-2); }
+.tl-note b { color: var(--ink); }
+.sp { flex: 1; }
+.muted { color: var(--ink-3); }
+.ink { color: var(--ink); }
+a.act { color: var(--act); text-decoration: none; }
+a.act:hover { color: var(--act-hover); text-decoration: underline; text-underline-offset: 3px; }
+@container main (max-width: 1150px) { .tbl .hide-md { display: none; } }
+.tcards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-where" x1="273.74" y1="43.63" x2="670.24" y2="43.63" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5CF8E" /><stop offset="1" stop-color="#FF66CB" />
+    </linearGradient>
+    <linearGradient id="g-wm-em-a" x1="3" y1="73.61" x2="55.51" y2="73.61" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5CF8D" /><stop offset="1" stop-color="#E36FAB" />
+    </linearGradient>
+    <linearGradient id="g-wm-em-b" x1=".86" y1="37.19" x2="62.8" y2="37.19" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5CF8D" /><stop offset="1" stop-color="#E36FAB" />
+    </linearGradient>
+    <linearGradient id="g-em-a" x1="8.42" y1="206.67" x2="155.83" y2="206.67" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5CF8D" /><stop offset="1" stop-color="#E36FAB" />
+    </linearGradient>
+    <linearGradient id="g-em-b" x1="2.42" y1="104.41" x2="176.3" y2="104.41" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5CF8D" /><stop offset="1" stop-color="#E36FAB" />
+    </linearGradient>
+    <linearGradient id="g-trail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F5CF8D" /><stop offset="1" stop-color="#FF66CB" />
+    </linearGradient>
+  </defs>
+
+  <!-- Wordmark. On night, "STEP" and the emblem's shadow layers use currentColor (ink). -->
+  <symbol id="wordmark" viewBox="0 0 670.24 84">
+    <g fill="currentColor">
+      <path d="M94.04,78.63V21.83h-22.4v-13.2h61v13.2h-22.4v56.8h-16.2Z"/>
+      <path d="M208.44,78.63V8.63h30.3c6.27,0,11.67,1.020,16.2,3.05,4.53,2.03,8.030,4.95,10.5,8.75,2.47,3.8,3.7,8.33,3.7,13.6s-1.23,9.7-3.7,13.5c-2.47,3.8-5.97,6.72-10.5,8.75-4.53,2.03-9.93,3.05-16.2,3.05h-21.3l7.2-7.3v26.6h-16.2ZM224.64,53.83l-7.2-7.7h20.4c5,0,8.73-1.07,11.2-3.2,2.47-2.13,3.7-5.1,3.7-8.9s-1.23-6.87-3.7-9c-2.47-2.13-6.2-3.2-11.2-3.2h-20.4l7.2-7.7v39.7Z"/>
+      <path d="M141.34,78.63V8.63h52.9v13h-36.8v44h38.1v13h-54.2ZM156.24,49.43v-12.6h33.7v12.6h-33.7Z"/>
+    </g>
+    <path fill="url(#g-where)" d="M296.64,78.63l-22.9-70h16.8l19.9,62h-8.4l20.8-62h15l20,62h-8.1l20.4-62h15.5l-22.9,70h-17.4l-17.7-54.4h4.6l-18.2,54.4h-17.4ZM394.64,78.63V8.63h16.2v70h-16.2ZM409.64,49.93v-13.7h34.2v13.7h-34.2ZM442.64,78.63V8.63h16.2v70h-16.2ZM475.44,78.63V8.63h52.9v13h-36.8v44h38.1v13h-54.2ZM490.34,49.43v-12.6h33.7v12.6h-33.7ZM542.54,78.63V8.63h29.9c9.73,0,17.3,2.25,22.7,6.75,5.4,4.5,8.1,10.72,8.1,18.65,0,5.2-1.23,9.68-3.7,13.45-2.47,3.77-5.970,6.65-10.5,8.65-4.53,2-9.93,3-16.2,3h-21.3l7.2-7.1v26.6h-16.2ZM558.74,53.830l-7.2-7.6h20.4c5,0,8.73-1.08,11.2-3.25,2.47-2.17,3.7-5.15,3.7-8.95s-1.23-6.87-3.7-9c-2.47-2.13-6.2-3.2-11.2-3.2h-20.4l7.2-7.7v39.7ZM587.04,78.63l-17.5-25.4h17.3l17.7,25.4h-17.5ZM616.04,78.63V8.63h52.9v13h-36.8v44h38.1v13h-54.2ZM630.94,49.43v-12.6h33.7v12.6h-33.7Z"/>
+    <path fill="url(#g-wm-em-a)" d="M8.45,63.24c15.32,6.07,30.24,12.18,47.05,12.34-2,1.31-3.86,2.92-6.02,3.88-15.44,6.85-30.48,6.02-44.96-2.82-1.86-1.14-1.85-1.34-.88-3.34,1.67-3.45,3.31-6.91,4.8-10.04h0Z"/>
+    <path fill="currentColor" d="M6.75,60.15c15.01,6.79,29.62,13.62,46.41,14.58-2.06,1.21-4,2.73-6.2,3.58-15.76,6.1-30.73,4.55-44.77-4.98-1.81-1.23-1.78-1.42-.72-3.38,1.83-3.36,3.630-6.74,5.28-9.8h0Z"/>
+    <path fill="url(#g-wm-em-b)" d="M51.31,24.09c-2.74-1.48-5.27-3.14-8.02-4.27-5.57-2.29-11.37-3.16-17.31-1.51-1.1.3-2.19.85-3.12,1.52-3.04,2.19-3.35,6.11-.38,8.4,1.98,1.52,4.38,2.63,6.75,3.48,5.33,1.92,10.86,3.32,16.12,5.4,5.82,2.29,10.9,5.77,14.38,11.22,4.26,6.67,4.12,16.66-.49,23.05-.17.24-.57.76-1.07,1.12-.28-3.63-3.24-4.37-5.49-6.04-3.37-2.51-6.370-5.52-9.41-8.45-1.76-1.7-3.42-3.54-4.86-5.51-1.03-1.39-1.71-3.06-2.38-4.68-.46-1.1-.66-2.31-2.12-2.45-1.33-.12-3.65,1.32-3.79,2.5-.13,1.15-.73,1.59-1.69,1.97-3.64,1.43-6.76-.15-7.68-3.94-.53-2.21-1.96-2.9-4-1.94-.4.19-.87.33-1.17.64-2.06,2.06-2.23,1.42-4.59-.02-3.89-2.37-7.02-5.46-8.68-9.82-1.99-5.24-1.84-10.54.02-15.72C5.68,9.7,12.88,4.91,22.22,2.9c8.2-1.77,16.3-1.13,24.25,1.36,4.37,1.37,8.38,3.57,12.1,6.25.7.51,1.09,1.13.53,1.99-2.39,3.69-4.78,7.38-7.19,11.06-.17.26-.5.43-.61.53h0Z"/>
+    <path fill="currentColor" d="M50.4,21.92c-2.76-1.44-5.31-3.06-8.08-4.15-5.6-2.21-11.41-3-17.33-1.27-1.1.32-2.18.88-3.1,1.57-3.01,2.23-3.26,6.16-.27,8.4,2,1.5,4.41,2.56,6.8,3.39,5.36,1.85,10.9,3.17,16.2,5.17,5.85,2.21,10.98,5.61,14.53,11.01,4.35,6.61,4.3,16.75-.22,23.2-.17.24-.51.62-1,.99-.33-3.63-3.31-4.33-5.57-5.97-3.4-2.46-6.45-5.43-9.52-8.32-1.78-1.67-3.47-3.49-4.94-5.44-1.04-1.38-1.75-3.04-2.44-4.64-.47-1.09-.69-2.3-2.16-2.42-1.33-.11-3.63,1.37-3.75,2.55-.11,1.15-.71,1.6-1.66,1.99-3.62,1.48-6.77-.05-7.74-3.83-.57-2.2-2-2.87-4.03-1.88-.4.2-.86.35-1.160.65-2.02,2.09-2.21,1.45-4.59.05-3.93-2.31-7.09-5.36-8.81-9.7-2.07-5.21-1.99-10.52-.2-15.71C4.57,8.18,11.71,3.29,21.02,1.14c8.17-1.89,16.28-1.36,24.26,1.02,4.39,1.31,8.43,3.45,12.19,6.08.71.5,1.11,1.11.56,1.98-2.34,3.72-4.68,7.44-7.03,11.16-.17.27-.49.43-.61.53h0Z"/>
+  </symbol>
+
+  <!-- Emblem (collapsed sidebar, favicon). On night the top shape is ink, the shadow is canvas-dark. -->
+  <symbol id="emblem" viewBox="0 0 176.3 235.82">
+    <path fill="url(#g-em-a)" d="M23.73,177.53c43.02,17.03,84.89,34.2,132.1,34.63-5.61,3.67-10.85,8.19-16.9,10.88-43.36,19.23-85.56,16.91-126.23-7.93-5.23-3.19-5.180-3.75-2.46-9.38,4.68-9.68,9.28-19.4,13.48-28.2h.01Z"/>
+    <path fill="currentColor" d="M18.96,168.87c42.15,19.07,83.15,38.24,130.29,40.930-5.78,3.4-11.23,7.66-17.4,10.05-44.24,17.13-86.27,12.78-125.7-13.97-5.07-3.44-5-3.99-2.01-9.49,5.14-9.44,10.2-18.93,14.82-27.52h0Z"/>
+    <path fill="url(#g-em-b)" d="M144.05,67.63c-7.69-4.15-14.8-8.81-22.51-11.98-15.64-6.42-31.92-8.86-48.61-4.25-3.09.85-6.16,2.4-8.77,4.27-8.54,6.14-9.4,17.16-1.08,23.58,5.55,4.28,12.29,7.38,18.94,9.78,14.97,5.39,30.48,9.33,45.26,15.15,16.34,6.44,30.6,16.2,40.36,31.49,11.95,18.73,11.57,46.76-1.38,64.7-.47.66-1.59,2.14-3.01,3.15-.79-10.19-9.11-12.27-15.4-16.97-9.45-7.05-17.89-15.51-26.41-23.72-4.94-4.76-9.59-9.94-13.65-15.47-2.88-3.91-4.79-8.6-6.68-13.13-1.28-3.08-1.85-6.49-5.95-6.88-3.73-.35-10.25,3.7-10.63,7.01-.37,3.22-2.05,4.47-4.74,5.53-10.22,4.01-18.99-.42-21.57-11.06-1.5-6.2-5.5-8.14-11.23-5.44-1.13.53-2.43.94-3.28,1.79-5.77,5.79-6.26,3.98-12.9-.05-10.93-6.64-19.7-15.32-24.36-27.58-5.6-14.72-5.17-29.6.06-44.12C15.94,27.24,36.16,13.8,62.38,8.14c23.02-4.97,45.76-3.18,68.08,3.83,12.28,3.86,23.53,10.01,33.98,17.56,1.97,1.42,3.06,3.17,1.5,5.58-6.72,10.35-13.42,20.71-20.19,31.04-.48.74-1.39,1.2-1.72,1.48h.02Z"/>
+    <path fill="currentColor" d="M141.49,61.53c-7.75-4.04-14.92-8.6-22.68-11.66-15.73-6.2-32.04-8.41-48.66-3.57-3.08.9-6.12,2.48-8.71,4.4-8.45,6.26-9.16,17.29-.75,23.59,5.61,4.2,12.39,7.2,19.08,9.51,15.04,5.18,30.61,8.9,45.47,14.51,16.43,6.21,30.83,15.76,40.8,30.92,12.21,18.56,12.08,47.02-.62,65.13-.47.66-1.42,1.73-2.82,2.77-.93-10.18-9.28-12.15-15.63-16.75-9.54-6.92-18.1-15.25-26.74-23.35-5.01-4.69-9.73-9.81-13.87-15.27-2.93-3.87-4.91-8.53-6.86-13.04-1.32-3.06-1.94-6.47-6.05-6.79-3.73-.3-10.19,3.84-10.53,7.16-.32,3.23-1.99,4.5-4.66,5.6-10.16,4.16-19-.15-21.73-10.75-1.59-6.18-5.61-8.06-11.3-5.28-1.12.55-2.42.97-3.25,1.83-5.68,5.87-6.2,4.07-12.9.13-11.02-6.48-19.91-15.04-24.74-27.23-5.81-14.64-5.58-29.53-.56-44.11C12.84,22.96,32.87,9.24,59.01,3.21c22.95-5.3,45.71-3.82,68.12,2.87,12.33,3.68,23.67,9.68,34.23,17.08,1.99,1.4,3.11,3.13,1.58,5.56-6.57,10.45-13.13,20.9-19.75,31.32-.47.75-1.38,1.22-1.7,1.5h0Z"/>
+  </symbol>
+
+  <!-- Icons: 24px grid, stroke only -->
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-9.5Z"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M10 7h4"/><circle cx="12" cy="15" r="2"/></symbol>
+  <symbol id="i-child" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/></symbol>
+  <symbol id="i-family" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.5"/><path d="M2.5 20a5.5 5.5 0 0 1 11 0M14 20a4 4 0 0 1 7.5-2"/></symbol>
+  <symbol id="i-fence" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6 6 0 0 1 3 6"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2.5 2.5M18 5l2 2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m10 7 5 5-5 5"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="m8 10 4-4 4 4M8 14l4 4 4-4"/></symbol>
+  <symbol id="i-arrow-d" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M15.5 12.5 18.7 9.3a4 4 0 0 0-5.7-5.7L11 5.6M8.5 11.5 5.3 14.7a4 4 0 0 0 5.7 5.7l2-2M4 4l16 16"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M22 11v2M6 10v4M9 10v4"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><path d="M4 20v-3M9 20v-7M14 20v-11M19 20V4"/></symbol>
+  <symbol id="i-sat" viewBox="0 0 24 24"><path d="m13 7 4 4M9.5 10.5l4 4M5 13l6 6M14 4l6 6-3 3-6-6 3-3ZM4 20l3-3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5a.6.6 0 0 0 .5.9h17.4a.6.6 0 0 0 .5-.9L12 4Z"/><path d="M12 10v4.5M12 17.5v.01"/></symbol>
+  <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+  <symbol id="i-zoom-in" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></symbol>
+  <symbol id="i-zoom-out" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+</svg>
+
+<svg class="sprite" aria-hidden="true" focusable="false"><symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8 1c0 1.6-2.4 2.1-2.4 3.6M12 17h.01"/></symbol><symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 18a8.5 8.5 0 1 1 15 0"/><path d="m12 13.5 3.5-4"/></symbol><symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9.5 3v3M14.5 3v3M9.5 18v3M14.5 18v3M3 9.5h3M3 14.5h3M18 9.5h3M18 14.5h3"/></symbol><symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.5 6.5a4 4 0 0 0 5 5l-8.2 8.2a2.1 2.1 0 0 1-3-3l8.2-8.2a4 4 0 0 0-2-2Z"/><path d="M14.5 6.5 17 4l3 3-2.5 2.5"/></symbol><symbol id="i-list" viewBox="0 0 24 24"><path d="m4 7 1.5 1.5L8 6M4 17l1.5 1.5L8 16M11 7.5h9M11 12h9M11 17h9"/></symbol><symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z"/></symbol><symbol id="i-server" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></symbol><symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6.5h11v10H3zM14 10h3.5l3 3.2v3.3H14"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol><symbol id="i-factory" viewBox="0 0 24 24"><path d="M3.5 20V10l5 3.2V10l5 3.2V6.5L20.5 4v16Z"/><path d="M7.5 17h1M12 17h1M16.5 17h1"/></symbol><symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8.5 8v8M12 8v8M15.5 8v8"/></symbol><symbol id="i-arrow-ur" viewBox="0 0 24 24"><path d="M7.5 16.5 16.5 7.5M9 7.5h7.5V15"/></symbol><symbol id="i-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5"/></symbol><symbol id="i-shoe" viewBox="0 0 24 24"><path d="M3.5 15.5V8.5a1 1 0 0 1 1.4-.9l2.6 1.2c.9.4 2 .1 2.5-.8L11 6l2 4.3c1.4 2.9 4.2 4 7 4.6.5.1.9.6.9 1.1V17a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-1.5Z"/><path d="M3.5 15.5h18"/></symbol><symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5-10-6.5Z"/></symbol><symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5M7 17H5a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 5 9h14a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 19 17h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></symbol><symbol id="i-usb" viewBox="0 0 24 24"><path d="M12 21v-4.5M9 3v4M15 3v4M7 7h10v5a4.5 4.5 0 0 1-4.5 4.5h-1A4.5 4.5 0 0 1 7 12V7Z"/></symbol><symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m7.5 9.5 3 2.5-3 2.5M12.5 15h4"/></symbol><symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-.5a6 6 0 0 1-4.6-2.2L3.6 16a1.5 1.5 0 0 1 2.3-2L8 16"/></symbol><symbol id="i-wifi" viewBox="0 0 24 24"><path d="M3.5 9.5a12 12 0 0 1 17 0M6.5 12.8a7.5 7.5 0 0 1 11 0M9.5 16a3 3 0 0 1 5 0"/><circle cx="12" cy="19" r=".6"/></symbol><symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.5 3.5H5a1.5 1.5 0 0 0-1.5 1.5v7.5l8.6 8.6a1.5 1.5 0 0 0 2.1 0l6.3-6.3a1.5 1.5 0 0 0 0-2.1Z"/><circle cx="8.2" cy="8.2" r="1.3"/></symbol><symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4.5 15v3.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol><symbol id="i-git" viewBox="0 0 24 24"><circle cx="6.5" cy="6" r="2"/><circle cx="6.5" cy="18" r="2"/><circle cx="17.5" cy="8" r="2"/><path d="M6.5 8v8M17.5 10a6 6 0 0 1-6 6H8.5"/></symbol></svg>
+<div id="root"></div>
+<script>
+/* Production QA mockup on Night Trail. Plain JS, no build step. */
+const ic = (n, cls = '') => `<svg class="i ${cls}"><use href="#${n}"/></svg>`;
+const pill = (t, tone = '') => `<span class="pill ${tone ? 'pill-' + tone : ''}">${t}</span>`;
+const tag = (t) => (t ? `<span class="tag">${t}</span>` : '<span class="muted">—</span>');
+const at = (o) =>
+  `${o.go ? ` data-go="${o.go}"` : ''}${o.act ? ` data-act="${o.act}"` : ''}${o.arg !== undefined ? ` data-arg="${o.arg}"` : ''}`;
+const btn = (l, o = {}) =>
+  `<button type="button" class="btn btn-${o.v || 'secondary'}${o.sm ? ' btn-sm' : ''}${o.lg ? ' btn-lg' : ''}${l ? '' : ' btn-icon'} fr"${at(o)}${o.title ? ` title="${o.title}"` : ''}>${o.spin ? '<span class="spinner"></span>' : ''}${o.icon ? ic(o.icon, o.sm ? 'i-sm' : '') : ''}${l || ''}${o.kbd ? `<span class="kbd">${o.kbd}</span>` : ''}</button>`;
+const fresh = (t, f) => `<span class="fresh ${f}"><span class="ticks"><i></i><i></i><i></i></span>${t}</span>`;
+const stat = (l, v, o = {}) =>
+  `<div class="stat${o.go || o.act ? ' click' : ''}"${at(o)}><span class="label">${o.dot ? `<span class="dot" style="background:var(--${o.dot})"></span>` : ''}${l}</span><div class="v${o.sm ? ' sm' : ''}">${v}${o.unit ? `<small>${o.unit}</small>` : ''}</div>${o.d ? `<div class="d">${o.d}</div>` : ''}${o.meter != null ? `<div class="meter"><i style="width:${o.meter}%;background:${o.mc || 'var(--trail)'}"></i></div>` : ''}</div>`;
+const pn = (title, body, o = {}) =>
+  `<section class="pn"${o.id ? ` id="${o.id}"` : ''}>${title ? `<div class="hd"><b>${title}${o.sub ? `<span class="sub2">${o.sub}</span>` : ''}</b>${o.actions ? `<div class="row" style="gap:6px">${o.actions}</div>` : ''}</div>` : ''}<div class="bd${o.flush ? ' flush' : ''}">${body}</div></section>`;
+const side = (title, body, o = {}) =>
+  `<section class="side-card"><div class="hd"><b>${title}</b>${o.right || ''}</div>${o.kv ? `<dl class="kv">${body}</dl>` : `<div class="bd">${body}</div>`}</section>`;
+const head = (t, d, a = '') => `<div class="page-head"><div><h2>${t}</h2><p class="num">${d}</p></div><div class="acts">${a}</div></div>`;
+const tabs = (items, cur, act) =>
+  `<div class="tabs" role="tablist">${items.map(([k, l, n]) => `<button type="button" class="tab fr" role="tab" aria-selected="${k === cur}" data-act="${act}" data-arg="${k}">${l}${n !== undefined ? `<span class="count">${n}</span>` : ''}</button>`).join('')}</div>`;
+const seg = (items, cur, act) =>
+  `<div class="seg" role="group">${items.map(([k, l]) => `<button type="button" class="fr" aria-pressed="${k === cur}"${act ? ` data-act="${act}" data-arg="${k}"` : ''}>${l}</button>`).join('')}</div>`;
+const chip = (l, val) =>
+  val
+    ? `<button type="button" class="chip on fr">${ic('i-filter', 'i-sm')}${l} <span class="val">${val}</span>${ic('i-x', 'i-sm x')}</button>`
+    : `<button type="button" class="chip fr">${ic('i-plus', 'i-sm')}${l}</button>`;
+const search = (ph, w = 240) => `<div class="field" style="width:${w}px;max-width:100%">${ic('i-search')}<input placeholder="${ph}" /></div>`;
+const cbx = (on) => `<span class="box${on ? ' is-on' : ''}"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>`;
+const rk = (r, w) => {
+  const m = { pass: ['i-check', 'Pass'], fail: ['i-x', 'Fail'], run: [null, 'Running'], skip: [null, 'Skipped'] }[r];
+  if (!m) return '<span class="muted">—</span>';
+  const lead = r === 'run' ? '<span class="live"></span>' : m[0] ? ic(m[0]) : '';
+  return `<span class="rk ${r}">${lead}${w === '' ? '' : w || m[1]}</span>`;
+};
+const oq = (t) => `<div class="oq">${ic('i-help')}<span><b>Open question.</b> ${t}</span></div>`;
+const insight = (t) => `<div class="insight">${ic('i-alert')}<span>${t}</span></div>`;
+const tbl = (cols, rows, foot) =>
+  `<div class="tbl-wrap"><div class="tbl-scroll"><table class="tbl"><thead><tr>${cols.map((c) => (typeof c === 'string' ? `<th><span class="th-in">${c}</span></th>` : `<th class="${c[1]}"><span class="th-in">${c[0]}</span></th>`)).join('')}</tr></thead><tbody>${rows}</tbody></table></div>${foot ? `<div class="tbl-foot">${foot}</div>` : ''}</div>`;
+const pager = (txt, pages) =>
+  `<span class="num">${txt}</span><div class="pager"><button class="pg fr" disabled>${ic('i-chev-l', 'i-sm')}</button>${pages.map((p, i) => (p === '…' ? '<span style="padding:0 4px">…</span>' : `<button class="pg fr"${i === 0 ? ' aria-current="page"' : ''}>${p}</button>`)).join('')}<button class="pg fr">${ic('i-chev-r', 'i-sm')}</button></div>`;
+
+/* ---------------- data ---------------- */
+const STG = ['Registered', 'QA firmware', 'Board tests', 'Prod firmware', 'Functional tests', 'Assembled', 'Final test', 'Ready to ship', 'Shipped', 'Delivered'];
+const TITLES = { flow: 'User flow', overview: 'Overview', units: 'Units', unit: 'Unit', bench: 'Bench', runs: 'Test runs', suites: 'Test suites', firmware: 'Firmware', stations: 'Stations', shipping: 'Shipping' };
+const U = [
+  { sn: 'SW-2201-4XQ7', uid: '0039 2F3A 5143 91C4', imei: '867946053102187', batch: 'B-2610-A', stage: 3, status: 'progress', fw: 'qa-1.3', last: ['Board bring-up v3', 'pass', '14/14'], st: 'Bench 1', up: ['4m ago', 'f-recent'] },
+  { sn: 'SW-2204-9KD2', uid: '0039 2F3A 5143 92A0', imei: '867946053102190', batch: 'B-2610-A', stage: 3, status: 'progress', fw: 'qa-1.3', last: ['Flashing 1.2', 'run', '62%'], st: 'Bench 2', up: ['now', 'f-live'] },
+  { sn: 'SW-2197-T3MA', uid: '0039 2F3A 5143 8E12', imei: '867946053102181', batch: 'B-2610-A', stage: 4, status: 'progress', fw: '1.2', last: ['Functional v4', 'run', 'GPS 2:31'], st: 'Bench 1', up: ['31s ago', 'f-live'] },
+  { sn: 'SW-2188-7B09', uid: '0039 2F3A 5143 7B09', imei: '867946053102142', batch: 'B-2609-C', stage: 4, status: 'failed', fw: '1.2', last: ['GPS valid fix', 'fail', 'no fix in 7:00'], st: 'Bench 2', up: ['18m ago', 'f-recent'], fail: 'gps' },
+  { sn: 'SW-2209-QP4L', uid: '0039 2F3A 5143 93F1', imei: '—', batch: 'B-2610-A', stage: 2, status: 'failed', fw: 'qa-1.3', last: ['Modem responds to AT', 'fail', 'no response'], st: 'Bench 1', up: ['21m ago', 'f-recent'], fail: 'modem' },
+  { sn: 'SW-2176-HH2C', uid: '0039 2F3A 5143 8A44', imei: '867946053102176', batch: 'B-2609-C', stage: 5, status: 'progress', fw: '1.2', last: ['Functional v4', 'pass', '6/6'], st: 'Assembly', up: ['52m ago', 'f-recent'] },
+  { sn: 'SW-2171-ZN5E', uid: '0039 2F3A 5143 86D2', imei: '867946053102171', batch: 'B-2609-C', stage: 6, status: 'failed', fw: '1.2', last: ['Steps while worn', 'fail', '24 of 30 ±3'], st: 'Bench 3', up: ['1h ago', 'f-stale'], fail: 'steps' },
+  { sn: 'SW-2212-M2QP', uid: '0039 2F3A 5143 9C77', imei: '—', batch: 'B-2610-A', stage: 0, status: 'progress', fw: null, last: ['—', 'none', ''], st: 'Line jig', up: ['2h ago', 'f-stale'] },
+  { sn: 'SW-2168-L9YT', uid: '0039 2F3A 5143 8410', imei: '867946053102168', batch: 'B-2609-C', stage: 7, status: 'ready', fw: '1.2', last: ['Final v2', 'pass', '6/6'], st: 'Bench 3', up: ['3h ago', 'f-stale'] },
+  { sn: 'SW-2155-W3RS', uid: '0039 2F3A 5143 7F38', imei: '867946053102155', batch: 'B-2609-B', stage: 8, status: 'shipped', fw: '1.2', last: ['Final v2', 'pass', '6/6'], st: '—', up: ['15 Oct', 'f-off'] },
+  { sn: 'SW-2041-7K9Q', uid: '0039 2F3A 5143 74C1', imei: '356938035643809', batch: 'B-2609-B', stage: 9, status: 'delivered', field: 'active', fw: '1.2', last: ['Final v2', 'pass', '6/6'], st: '—', up: ['12s ago', 'f-live'] },
+  { sn: 'SW-1654-C1VU', uid: '0039 2F3A 5143 7255', imei: '867946053102122', batch: 'B-2609-A', stage: 9, status: 'delivered', field: 'offline', fw: '1.1', last: ['Final v1', 'pass', '5/5'], st: '—', up: ['3d ago', 'f-off'] },
+];
+const getU = (sn) => U.find((u) => u.sn === sn) || U[3];
+const S = { screen: 'flow', bench: 'idle', layout: 'single', unit: 'SW-2188-7B09', unitTab: 'timeline', shipTab: 'ready', suite: 'functional', fw: 'prod', unitsTab: 'all', runsTab: 'all', modal: null, sheet: null, usel: new Set(), ssel: new Set(['SW-2168-L9YT', 'SW-2169-L9YU']), sim: null };
+
+function uStatus(u) {
+  if (u.status === 'failed') return pill('Failed', 'breach');
+  if (u.status === 'hold') return pill('On hold', 'caution');
+  if (u.stage === 0) return pill('Registered', 'unset');
+  if (u.stage <= 6) return pill('In QA', 'info');
+  if (u.stage === 7) return pill('Ready', 'ok');
+  if (u.stage === 8) return pill('In transit', 'info');
+  return u.field === 'active' ? pill('Active', 'ok') : pill('Offline', 'muted');
+}
+const stageState = (u, i) => {
+  if (u.stage === 9 || i < u.stage || (i === u.stage && u.stage >= 7)) return 'done';
+  if (i === u.stage) return u.status === 'failed' ? 'fail' : 'here';
+  return 'todo';
+};
+const mini = (u) => `<span class="mini" title="${STG[u.stage]}">${STG.map((_, i) => `<i class="${stageState(u, i)}"></i>`).join('')}</span>`;
+function rail(u, times, compact) {
+  return `<ol class="rail${compact ? ' compact' : ''}">${STG.map((l, i) => {
+    const c = stageState(u, i);
+    return `<li class="${c}"><span class="node">${c === 'done' ? ic('i-check') : c === 'fail' ? ic('i-x') : i + 1}</span><span class="nm">${l}</span>${compact ? '' : `<span class="tm">${(times && times[i]) || ''}</span>`}</li>`;
+  }).join('')}</ol>`;
+}
+
+/* ---------------- chrome ---------------- */
+function sidebar() {
+  const cur = S.screen === 'unit' ? 'units' : S.screen;
+  const it = (icon, l, extra = '') => `<a class="nav-item fr" title="${l}">${ic(icon)}<span class="t">${l}</span>${extra}</a>`;
+  const sub = [
+    ['overview', 'Overview', 'i-gauge'],
+    ['units', 'Units', 'i-cpu', '<span class="nav-alert" title="7 failed">7</span>'],
+    ['bench', 'Bench', 'i-wrench'],
+    ['runs', 'Test runs', 'i-activity'],
+    ['suites', 'Test suites', 'i-list'],
+    ['firmware', 'Firmware', 'i-zap'],
+    ['stations', 'Stations', 'i-server', '<span class="nav-count">2/3</span>'],
+    ['shipping', 'Shipping', 'i-truck', '<span class="nav-count">64</span>'],
+  ];
+  return `<nav class="sidebar${S.collapsed ? ' is-collapsed' : ''}">
+    <div class="sb-brand"><svg class="wm" viewBox="0 0 670.24 84"><use href="#wordmark"/></svg><svg class="em" viewBox="0 0 176.3 235.82"><use href="#emblem"/></svg><button class="btn btn-ghost btn-sm btn-icon fr">${ic('i-panel', 'i-sm')}</button></div>
+    <div class="sb-group label"><span>General</span></div>${it('i-home', 'Overview')}
+    <div class="sb-group label"><span>Operations</span></div>
+    ${it('i-radio', 'Devices', '<span class="nav-count">1,284</span>')}${it('i-child', 'Children', '<span class="nav-count">962</span>')}${it('i-family', 'Families', '<span class="nav-count">511</span>')}${it('i-fence', 'Geofences', '<span class="nav-alert">3</span>')}
+    <div class="sb-group label"><span>Production</span></div>
+    <a class="nav-item is-open qa-root fr" title="QA">${ic('i-factory')}<span class="t">QA</span>${ic('i-chev-r', 'i-sm chev')}</a>
+    <div class="nav-sub">${sub.map(([k, l, icon, x]) => `<a class="nav-item fr" data-go="${k}" title="${l}"${cur === k ? ' aria-current="page"' : ''}>${ic(icon)}<span class="t">${l}</span>${x || ''}</a>`).join('')}</div>
+    <div class="sb-group label"><span>Access</span></div>${it('i-users', 'Users')}${it('i-key', 'Preview access')}
+    <a class="nav-item fr" title="Settings" style="margin-top:auto">${ic('i-settings')}<span class="t">Settings</span></a>
+    <div class="sb-foot"><span class="avatar">AR</span><div class="who"><b>Aryan</b><span>Super admin</span></div></div>
+  </nav>`;
+}
+function topbar() {
+  const crumbs = S.screen === 'unit' ? `<span>QA</span>${ic('i-chev-r', 'i-sm')}<span data-go="units" style="cursor:pointer">Units</span>${ic('i-chev-r', 'i-sm')}<b class="mono" style="font-size:13px">${S.unit}</b>` : `<span>QA</span>${ic('i-chev-r', 'i-sm')}<b>${TITLES[S.screen]}</b>`;
+  return `<div class="topbar"><div class="crumbs">${crumbs}</div><div class="field search">${ic('i-search')}<input placeholder="Search units, IMEI, chip UID" /><span class="kbd">⌘K</span></div>${btn('Scan', { icon: 'i-scan', sm: 1, go: 'bench', arg: 'idle' })}</div>`;
+}
+
+/* ---------------- FLOW ---------------- */
+function vFlow() {
+  const PH = [
+    ['01', 'Board bring-up', [['Bench', 'bench', 'idle']], 'Operator + bench agent', [['Registered', 'Scanned, or detected on the ST-LINK. Chip UID read over SWD.'], ['QA firmware', 'qa-1.3 flashed through STM32CubeProgrammer CLI.'], ['Board tests', 'UART commands: accelerometer, modem, SIM, IMEI/ICCID, GPS NMEA, Wi-Fi scan, battery.']]],
+    ['02', 'Production firmware', [['Bench', 'bench', 'loaded']], 'Bench agent + server', [['Prod firmware', '1.2 flashed and verified. The device then reports firmwareVersion itself.'], ['Functional tests', 'Server reads live telemetry: GSM ≤ 15 s and GPS ≤ 7 min (timed by uptimeMs), steps 20 ± 2.']]],
+    ['03', 'Assembly', [['Bench · assembly', 'bench', 'assembly']], 'Operator', [['Assembled', 'Shoe label scanned. Unit paired to shoe, size and side.'], ['Final test', 'In-shoe GSM, GPS, Wi-Fi fallback, steps while worn, charging.']]],
+    ['04', 'Dispatch', [['Shipping', 'shipping', 'ready']], 'Ops', [['Ready to ship', 'Passed every stage. Label printed.'], ['Shipped', 'Order, courier, tracking number.'], ['Delivered', 'Courier status, or the customer binds the device.']]],
+    ['05', 'Field', [['Shipping', 'shipping', 'active'], ['Devices', 'units', 'delivered']], 'Automatic', [['Active', 'Bound to a child and sending telemetry.'], ['Offline', 'Delivered but silent. Uses the existing freshness scale.']]],
+  ];
+  const HP = [['Scan unit', 'idle', 'i-scan', 'QR on the board or shoe. A USB scanner types like a keyboard.'], ['Run next step', 'loaded', 'i-play', 'One button. The unit’s stage decides what runs.'], ['Flash', 'flashing', 'i-zap', 'Agent drives STM32CubeProgrammer. Live progress and log.'], ['Live tests', 'testing', 'i-activity', 'GSM, GPS, Wi-Fi and steps from real telemetry.'], ['Result', 'pass', 'i-check', 'PASS continues. FAIL offers retest or rework.'], ['Pair with shoe', 'assembly', 'i-shoe', 'Scan the shoe label. Size and side are recorded.']];
+  const MAP = [['overview', 'Overview', 'Leads', 'Pipeline health, yield, what is failing'], ['units', 'Units', 'Admins, QA lead', 'Find any unit and its full history'], ['bench', 'Bench', 'Operators', 'The only screen an operator needs'], ['runs', 'Test runs', 'QA lead', 'Every run with measured values and logs'], ['suites', 'Test suites', 'QA / firmware', 'What runs at each stage, and thresholds'], ['firmware', 'Firmware', 'Firmware engineer', 'Builds from apps/firmware, channels, adoption'], ['stations', 'Stations', 'Admin', 'Bench PCs, agents, ST-LINKs, serial ports'], ['shipping', 'Shipping', 'Ops', 'Ready → shipped → delivered → active/offline']];
+  return `${head('User flow', 'How a bare board becomes a shipped shoe, and which screen each step happens on', btn('Open bench', { v: 'primary', icon: 'i-wrench', go: 'bench', arg: 'idle' }))}
+  <div class="phases">${PH.map(([no, t, where, who, items]) => `<div class="phase"><div><span class="no">${no}</span><h3>${t}</h3></div><div class="where">${where.map(([l, g, a]) => `<button type="button" class="link-tag fr" data-go="${g}" data-arg="${a}">${ic('i-arrow-ur')}${l}</button>`).join('')}<span class="tag" style="font-family:var(--font-sans)">${who}</span></div><ul>${items.map(([a, b]) => `<li><div><b>${a}</b><span>${b}</span></div></li>`).join('')}</ul></div>`).join('')}</div>
+  ${pn('When something fails', `<div class="loop">
+     <div class="lbox"><b>Any test fails</b><span>at any stage</span></div>${ic('i-arrow-r', 'arrow')}
+     <div class="lbox">${pill('Failed', 'breach')}<span>reason, measured value and log kept</span></div>${ic('i-arrow-r', 'arrow')}
+     <div class="lbox">${pill('Rework', 'caution')}<span>note, part swapped, who did it</span></div>${ic('i-arrow-r', 'arrow')}
+     <div class="lbox">${pill('In QA', 'info')}<span>back to the same stage, fully retested</span></div>
+     <span class="muted" style="margin:0 4px">or</span><div class="lbox">${pill('Scrapped', 'muted')}<span>terminal</span></div><div class="lbox">${pill('On hold', 'caution')}<span>waiting on parts</span></div>
+   </div>`, { sub: 'A unit never skips ahead silently. Skipping a step needs a reason and shows on the timeline.' })}
+  ${pn('Operator journey at the bench', `<div class="steps">${HP.map(([t, st, icon, s], i) => `<button type="button" class="stepc fr" data-go="bench" data-arg="${st}"><span class="n">STEP 0${i + 1}</span><b>${ic(icon)}${t}</b><span>${s}</span></button>`).join('')}</div>`, { sub: 'Click a step to open that Bench state. Flash and live tests play a short simulation.' })}
+  ${pn('Screens in this menu', tbl(['Screen', 'Used by', 'Job'], MAP.map(([k, l, w, j]) => `<tr class="click" data-go="${k}"><td><span class="primary-cell">${l}</span></td><td>${w}</td><td class="wrap">${j}</td></tr>`).join('')), { flush: true })}`;
+}
+
+/* ---------------- OVERVIEW ---------------- */
+function vOverview() {
+  const pipe = [['Registered', 18], ['QA firmware', 6], ['Board tests', 22], ['Prod firmware', 9], ['Functional tests', 41], ['Assembled', 17], ['Final test', 13]];
+  const hb = (l, n, o = {}) => `<div class="hb ${o.cls || ''}" data-go="${o.go || 'units'}" data-arg="${o.arg || 'qa'}"><span class="l">${o.pill || l}</span><span class="tr"><i style="width:${Math.min(100, (n / 64) * 100)}%"></i></span><span class="c">${n}</span></div>`;
+  const tp = [18, 22, 15, 0, 24, 27, 31, 29, 26, 0, 33, 30, 35, 28];
+  const bars = tp.map((v, i) => `<div class="b" style="--h:${(v / 40) * 100}%"><i></i><span class="tip tooltip">${5 + i} Oct · <b>${v}</b> units</span></div>`).join('');
+  return `${head('QA overview', '480 units · 126 in QA · 7 failed · 64 ready to ship', `<span class="live-badge"><span class="live"></span>2 benches live</span>${btn('Register units', { icon: 'i-plus', act: 'modal', arg: 'register' })}${btn('Open bench', { v: 'primary', icon: 'i-wrench', go: 'bench', arg: 'idle' })}`)}
+  <div class="toolbar">${chip('Batch', 'All')}${chip('Station')}${seg([['1d', '24h'], ['7d', '7d'], ['14d', '14d'], ['30d', '30d']], '14d')}</div>
+  <div class="stats n8">
+    ${stat('Total units', '480', { d: '3 batches', go: 'units', arg: 'all' })}
+    ${stat('In QA', '126', { dot: 'info', d: '7 stages', go: 'units', arg: 'qa' })}
+    ${stat('Failed', '7', { dot: 'breach', d: '<span class="down">↑ 2</span> since 09:00', go: 'units', arg: 'failed' })}
+    ${stat('Ready to ship', '64', { dot: 'ok', go: 'shipping', arg: 'ready' })}
+    ${stat('Shipped', '38', { d: 'in transit', go: 'shipping', arg: 'shipped' })}
+    ${stat('Delivered', '245', { go: 'shipping', arg: 'active' })}
+    ${stat('Active', '212', { dot: 'ok', d: '87% of delivered', meter: 87, mc: 'var(--ok)', go: 'shipping', arg: 'active' })}
+    ${stat('Offline', '33', { dot: 'ink-4', d: 'silent > 24 h', go: 'shipping', arg: 'offline' })}
+  </div>
+  <div class="grid2">
+    ${pn('Pipeline', `<div class="hbars"><div class="hsep label">In QA · 126</div>${pipe.map(([l, n]) => hb(l, n)).join('')}<div class="hsep label">After QA</div>${hb('', 7, { cls: 'fail', pill: pill('Failed', 'breach'), arg: 'failed' })}${hb('', 64, { pill: pill('Ready to ship', 'ok'), arg: 'ready' })}${hb('', 38, { pill: pill('In transit', 'info'), arg: 'shipped' })}${hb('', 245, { pill: 'Delivered', arg: 'delivered', cls: 'muted' })}</div><p class="note" style="margin-top:8px">Bars cap at 64. Delivered splits into 212 active and 33 offline.</p>`, { sub: 'Units at each stage right now. Click a row to filter Units.' })}
+    <div class="col">
+      <div class="stats n3">${stat('First-pass yield', '94.2', { unit: '%', d: '<span class="up">↑ 1.3%</span> vs last 14d', meter: 94, mc: 'var(--ok)' })}${stat('Median bench time', '6:48', { unit: 'min', d: 'scan → assembled' })}${stat('Rework', '3', { d: 'oldest 2 d' })}</div>
+      ${pn('Top failing tests', `<div class="lst">
+        <div class="li">${rk('fail', '')}<b>GPS fix &gt; 7 min</b><span class="r"><span class="tag" style="font-family:var(--font-sans)">Functional</span><b class="num">4</b></span></div>
+        <div class="li">${rk('fail', '')}<b>GSM first packet &gt; 15 s</b><span class="r"><span class="tag" style="font-family:var(--font-sans)">Functional</span><b class="num">2</b></span></div>
+        <div class="li">${rk('fail', '')}<b>Wi-Fi scan &lt; 3 APs</b><span class="r"><span class="tag" style="font-family:var(--font-sans)">Board</span><b class="num">1</b></span></div>
+        <div class="li">${rk('fail', '')}<b>Modem no AT response</b><span class="r"><span class="tag" style="font-family:var(--font-sans)">Board</span><b class="num">1</b></span></div></div>
+        <div style="margin-top:10px">${insight('<b>Bench 2</b> produced 3 of the 4 GPS failures. Check its antenna fixture before reworking those units.')}</div>`, { sub: 'Last 14 days' })}
+    </div>
+  </div>
+  <div class="grid2 even">
+    ${pn('Cleared to Ready, per day', `<div style="padding:8px 0 0 26px"><div class="bars-v"><span class="gl" style="bottom:50%"><span>20</span></span><span class="gl" style="bottom:100%"><span>40</span></span>${bars}</div><div class="bars-x">${tp.map((_, i) => `<span>${i % 2 ? '' : 5 + i}</span>`).join('')}</div></div>`, { sub: 'October · 0 on Sundays · hover a bar' })}
+    <div class="col">
+      ${side('Stations', `<div class="lst">
+        <div class="li"><span class="live"></span><b>Bench 1</b><span class="r muted">idle · 34 today</span></div>
+        <div class="li"><span class="live"></span><b>Bench 2</b><span class="r muted">flashing <span class="mono">SW-2204-9KD2</span></span></div>
+        <div class="li">${fresh('2h ago', 'f-stale')}<b>Line jig</b><span class="r">${pill('Offline', 'muted')}</span></div></div>`, { right: btn('', { v: 'ghost', sm: 1, icon: 'i-arrow-ur', go: 'stations' }) })}
+      ${side('Firmware on delivered units', `<div class="hbars">${hb('', 198, { pill: tag('1.2'), go: 'firmware', arg: '' })}${hb('', 47, { pill: tag('1.1'), go: 'firmware', arg: '', cls: 'muted' })}</div><p class="note" style="margin-top:6px">47 delivered units run a deprecated build.</p>`)}
+    </div>
+  </div>`;
+}
+
+/* ---------------- UNITS ---------------- */
+function vUnits() {
+  const T = [['all', 'All', 480], ['qa', 'In QA', 126], ['failed', 'Failed', 7], ['ready', 'Ready to ship', 64], ['shipped', 'Shipped', 38], ['delivered', 'Delivered', 245]];
+  const f = U.filter((u) => ({ qa: u.stage <= 6 && u.status !== 'failed', failed: u.status === 'failed', ready: u.stage === 7, shipped: u.stage === 8, delivered: u.stage === 9 })[S.unitsTab] ?? true);
+  const total = T.find((t) => t[0] === S.unitsTab)[2];
+  const rows = f.map((u) => `<tr class="click${S.usel.has(u.sn) ? ' is-selected' : ''}" data-go="unit" data-arg="${u.sn}">
+    <td class="c-check" data-act="usel" data-arg="${u.sn}">${cbx(S.usel.has(u.sn))}</td>
+    <td><span class="primary-cell mono">${u.sn}</span></td>
+    <td><span class="stage-cell">${mini(u)}<span class="nm">${STG[u.stage]}</span></span></td>
+    <td>${uStatus(u)}</td>
+    <td>${tag(u.fw)}</td>
+    <td>${u.last[1] === 'none' ? '<span class="muted">—</span>' : `${rk(u.last[1], u.last[0])}${u.last[2] ? `<span class="sub-cell">${u.last[2]}</span>` : ''}`}</td>
+    <td class="hide-md"><span class="mono">${u.imei}</span></td>
+    <td class="hide-md">${u.batch}</td>
+    <td>${u.st}</td>
+    <td>${fresh(u.up[0], u.up[1])}</td>
+    <td class="c-act">${btn('', { v: 'ghost', sm: 1, icon: 'i-more' }).replace('fr"', 'fr row-act"')}</td></tr>`).join('');
+  const n = S.usel.size;
+  return `${head('Units', '480 boards across 3 batches · 126 in QA right now', `${btn('Import', { icon: 'i-download' })}${btn('Print labels', { icon: 'i-printer' })}${btn('Register units', { v: 'primary', icon: 'i-plus', act: 'modal', arg: 'register' })}`)}
+  ${tabs(T, S.unitsTab, 'tab-units')}
+  <div class="toolbar">${search('Serial, IMEI, chip UID')}${chip('Stage')}${chip('Batch', 'B-2610-A, B-2609-C')}${chip('Firmware')}${chip('Station')}${btn('Reset', { v: 'ghost', sm: 1 })}<span class="sp"></span>${seg([['c', 'Compact'], ['f', 'Comfortable']], 'c')}</div>
+  ${tbl([[cbx(false), 'c-check'], 'Unit', 'Stage', 'Status', 'Firmware', 'Last test', ['IMEI', 'hide-md'], ['Batch', 'hide-md'], 'Station', 'Updated', ['', 'c-act']], rows || `<tr><td colspan="11"><div class="empty-state"><h4>No units here</h4></div></td></tr>`, pager(`Showing 1–${f.length} of ${total}`, ['1', '2', '3', '…', '24']))}
+  ${n ? `<div class="bulk bulk-float" style="bottom:28px;z-index:5"><span class="n">${cbx(true)}<b>${n}</b> selected</span><span class="sep"></span>${btn('Move to stage', { v: 'ghost', sm: 1, icon: 'i-arrow-r' })}${btn('Print labels', { v: 'ghost', sm: 1, icon: 'i-printer' })}${btn('Put on hold', { v: 'ghost', sm: 1, icon: 'i-clock' })}${btn('Scrap', { v: 'danger', sm: 1, icon: 'i-ban' })}<span class="sep"></span>${btn('', { v: 'ghost', sm: 1, icon: 'i-x', act: 'uclear' })}</div>` : ''}`;
+}
+
+/* ---------------- UNIT DETAIL ---------------- */
+const BOARD = [['MCU unique ID', 'SWD', 'readable', '0039…91C4'], ['Flash verify', 'SWD', 'CRC match', 'match'], ['Battery voltage', 'UART', '3.50–4.30 V', '3.96 V'], ['LDO rail (GSM/GPS)', 'UART', 'toggles', 'ok'], ['LIS2DS12 WHO_AM_I', 'UART', '= 0x43', '0x43'], ['Accelerometer self-test', 'UART', 'in range', 'ok'], ['Modem responds to AT', 'UART', '≤ 5 s', '1.2 s'], ['SIM ready (CPIN)', 'UART', 'READY', 'READY'], ['IMEI', 'UART', '15 digits', '8679…2142'], ['ICCID', 'UART', '19–20 digits', '8991…8901'], ['Signal (CSQ)', 'UART', '≥ 10', '18'], ['GPS NMEA output', 'UART', '≤ 5 s', '0.9 s'], ['Wi-Fi AP scan (AT+WIFIAPSCAN)', 'UART', '≥ 3 APs in 30 s', '7 APs'], ['LTE serving cell (AT+NETDMSG)', 'UART', 'parsed', 'Jio · 40486']];
+const FUNC = [['GSM first packet accepted', 'Cloud', 'uptime ≤ 15 s', '9.4 s'], ['Firmware reports version', 'Cloud', '= 1.2', '1.2'], ['GPS valid fix', 'Cloud', 'uptime ≤ 7:00 · ≥ 4 sats', '3:12 · 6 sats'], ['Step count', 'Cloud + operator', '20 ± 2', '20'], ['Wi-Fi location fallback', 'Cloud', 'resolves ≤ 150 m', '62 m'], ['Telemetry cadence', 'Cloud', '≥ 90% of 8 s packets', '96%']];
+const FINAL = [['Shoe label matches unit', 'Scan', 'match', 'match'], ['GSM in shoe', 'Cloud', '≤ 20 s', '11.2 s'], ['GPS in shoe', 'Cloud', '≤ 7:00', '4:05'], ['Wi-Fi scan in shoe', 'Cloud', '≥ 2 APs', '5 APs'], ['Steps while worn', 'Cloud + operator', '30 ± 3', '30'], ['Charging detected', 'Manual', 'LED + voltage rise', 'ok']];
+function suiteRows(name, ver, rows, si, u) {
+  if (u.stage < si) return '';
+  const cur = u.stage === si;
+  let stop = false;
+  const body = rows.map((r, i) => {
+    let res = 'pass', meas = r[3];
+    if (cur && u.status === 'failed') {
+      if (stop) { res = 'skip'; meas = '—'; }
+      else if ((u.fail === 'modem' && r[0].startsWith('Modem')) || (u.fail === 'gps' && r[0] === 'GPS valid fix') || (u.fail === 'steps' && r[0] === 'Steps while worn')) {
+        res = 'fail'; meas = u.fail === 'modem' ? 'no response' : u.fail === 'gps' ? 'no fix · best 2 sats' : '24'; if (u.fail === 'modem') stop = true;
+      }
+    } else if (cur && u.status === 'progress' && i > 1) { res = 'run'; meas = '…'; }
+    return `<tr><td><span class="ink">${r[0]}</span></td><td><span class="tag" style="font-family:var(--font-sans)">${r[1]}</span></td><td>${r[2]}</td><td><span class="mono">${meas}</span></td><td>${rk(res)}</td></tr>`;
+  }).join('');
+  const sum = cur && u.status === 'failed' ? pill('Failed', 'breach') : cur && u.status === 'progress' ? `<span class="live-badge"><span class="live"></span>Running</span>` : pill('Passed', 'ok');
+  return `<tr><td colspan="5" style="background:var(--night-raised)"><span class="row" style="gap:10px"><b class="ink">${name}</b><span class="tag">${ver}</span>${sum}</span></td></tr>${body}`;
+}
+function timeline(u) {
+  const T = ['09:12', '09:13', '09:16', '09:40', '09:44', '10:05', '10:30', '10:58', '15 Oct', '16 Oct'];
+  const ev = [
+    ['Registered', 'Chip UID read over SWD · ST-LINK #1 · Bench 1 · Ravi', 'var(--unset)'],
+    ['QA firmware flashed', 'qa-1.3 · 11.8 s · verified · job FJ-8790', 'var(--ok)'],
+    ['Board tests passed', 'Board bring-up v3 · 14/14 · 7 Wi-Fi APs seen', 'var(--ok)'],
+    ['Production firmware flashed', '1.2 · 3.4 s · verified · device reported firmwareVersion 1.2', 'var(--ok)'],
+    ['Functional tests passed', 'Functional v4 · 6/6 · GSM 9.4 s · GPS 3:12 · steps 20/20', 'var(--ok)'],
+    ['Paired to shoe', 'SHOE-UK7-L-0412 · UK 7 · left · pair PR-0412', 'var(--ok)'],
+    ['Final test passed', 'Final v2 · 6/6', 'var(--ok)'],
+    ['Ready to ship', 'Label printed by Meena', 'var(--ok)'],
+    ['Shipped', 'ORD-1043 · Delhivery · AWB 1593 2210 4471', 'var(--info)'],
+    ['Delivered', 'Bound to Aarav Mehta on first boot', 'var(--trail)'],
+  ];
+  const out = [];
+  for (let i = 0; i < u.stage; i++) out.push(`<li class="tl-item"><span class="tl-dot"><i style="background:${ev[i][2]}"></i></span><div><b>${ev[i][0]}</b><span>${ev[i][1]}</span></div><time>${T[i]}</time></li>`);
+  if (u.stage === 9) out.push(`<li class="tl-item"><span class="tl-dot"><i style="background:${ev[9][2]}"></i></span><div><b>${ev[9][0]}</b><span>${ev[9][1]}</span></div><time>${T[9]}</time></li>`);
+  else if (u.status === 'failed') {
+    out.push(`<li class="tl-item"><span class="tl-dot"><i style="background:var(--breach)"></i></span><div><b>${STG[u.stage]} failed: ${u.last[0]}</b><span>${u.last[2]} · run R-2303 · ${u.st} · Meena</span>${u.fail === 'gps' ? '<div class="tl-note"><b>Meena:</b> GPS antenna connector looked loose. Reseated it, sending to rework.</div>' : ''}</div><time>${u.up[0]}</time></li>`);
+    out.push(`<li class="tl-item"><span class="tl-dot"><i style="background:var(--caution)"></i></span><div><b>Waiting for rework</b><span>Goes back to ${STG[u.stage]} after rework</span></div><time></time></li>`);
+  } else if (u.stage < 7) out.push(`<li class="tl-item"><span class="tl-dot"><i style="background:var(--trail)"></i></span><div><b>${STG[u.stage]} in progress</b><span>${u.last[0]} · ${u.last[2] || 'waiting'} · ${u.st}</span></div><time>${u.up[0]}</time></li>`);
+  return `<ol class="timeline" style="padding:0">${out.reverse().join('')}</ol>`;
+}
+function vUnit() {
+  const u = getU(S.unit);
+  const T = ['09:12', '09:13', '09:16', '09:40', '09:44', '10:05', '10:30', '10:58', '15 Oct', '16 Oct'];
+  const times = T.map((t, i) => (i < u.stage || u.stage === 9 ? t : i === u.stage ? 'now' : ''));
+  const failed = u.status === 'failed';
+  let tab = '';
+  if (S.unitTab === 'timeline') tab = pn('', timeline(u));
+  if (S.unitTab === 'tests') tab = u.stage < 2 ? pn('', `<div class="empty-state"><span class="ei">${ic('i-list')}</span><h4>No test runs yet</h4><p>Board tests run once the QA firmware is flashed.</p></div>`) : tbl(['Test', 'Source', 'Pass when', 'Measured', 'Result'], suiteRows('Final (in shoe)', 'v2', FINAL, 6, u) + suiteRows('Functional', 'v4', FUNC, 4, u) + suiteRows('Board bring-up', 'v3', BOARD, 2, u));
+  if (S.unitTab === 'firmware') tab = tbl(['Job', 'Build', 'Station · probe', 'Duration', 'Result', 'When'], `${u.stage >= 4 ? `<tr><td><span class="mono">FJ-8812</span></td><td>${tag('1.2')}</td><td>Bench 2 · ST-LINK #1</td><td class="num">3.4 s</td><td>${rk('pass', 'Verified')}</td><td>09:40</td></tr>` : ''}${u.stage === 3 && u.status === 'progress' ? `<tr><td><span class="mono">FJ-8813</span></td><td>${tag('1.2')}</td><td>${u.st} · ST-LINK #1</td><td class="num">—</td><td>${rk('run', 'Queued')}</td><td>now</td></tr>` : ''}${u.stage >= 1 ? `<tr><td><span class="mono">FJ-8790</span></td><td>${tag('qa-1.3')}</td><td>Bench 1 · ST-LINK #1</td><td class="num">11.8 s</td><td>${rk('pass', 'Verified')}</td><td>09:13</td></tr>` : '<tr><td colspan="6"><div class="empty-state"><h4>Never flashed</h4></div></td></tr>'}`);
+  if (S.unitTab === 'telemetry') tab = u.stage < 4 ? pn('', `<div class="empty-state"><span class="ei">${ic('i-signal')}</span><h4>No telemetry yet</h4><p>The unit starts reporting once it runs production firmware.</p></div>`) : `<div class="stats">${stat('Last fix', u.fail === 'gps' ? '—' : '12', { unit: u.fail === 'gps' ? '' : 's ago', d: u.fail === 'gps' ? fresh('Wi-Fi · ±62 m', 'f-stale') : fresh('GPS · ±6 m', 'f-live') })}${stat('Battery', '96', { unit: '%', d: '3.96 V', meter: 96, mc: 'var(--ok)' })}${stat('Signal', '−71', { unit: 'dBm', d: `Jio · LTE · ${u.fail === 'gps' ? 2 : 6} satellites` })}${stat('Steps', '20', { d: 'since boot · uptime 4:12' })}</div><p class="note" style="margin-top:10px">Same tiles as Devices › Overview. Telemetry from units still in QA is tagged and never reaches a child’s history.</p>`;
+  if (S.unitTab === 'shoe') tab = u.stage < 5 ? pn('', `<div class="empty-state"><span class="ei">${ic('i-shoe')}</span><h4>Not in a shoe yet</h4><p>Units are paired to a shoe at the Assembly step on the Bench.</p></div>`) : `<div class="grid2 even">${side('Shoe', `<dt>Label</dt><dd><span class="mono">SHOE-UK7-L-0412</span></dd><dt>SKU</dt><dd>StepKids Runner · Navy</dd><dt>Size · side</dt><dd>UK 7 · Left</dd><dt>Pair</dt><dd>PR-0412 · <a class="act mono" href="#">SW-2177-HH2D</a></dd>`, { kv: 1 })}${side('Shipping', u.stage >= 8 ? `<dt>Order</dt><dd>ORD-1043</dd><dt>Courier</dt><dd>Delhivery · <span class="mono">1593 2210 4471</span></dd><dt>Shipped</dt><dd>15 Oct</dd><dt>Delivered</dt><dd>${u.stage === 9 ? '16 Oct' : '—'}</dd><dt>Field</dt><dd>${u.stage === 9 ? uStatus(u) : '—'}</dd>` : '<dt>Status</dt><dd class="muted">Not shipped yet</dd>', { kv: 1, right: u.stage >= 8 ? pill('Shipped', 'info') : '' })}</div>`;
+  return `<div class="detail-head"><span class="device-glyph">${ic('i-cpu')}</span>
+    <div style="min-width:0"><h2><span class="mono" style="font-size:19px">${u.sn}</span>${uStatus(u)}${u.status === 'progress' && u.stage > 0 && u.stage < 7 ? '<span class="live-badge"><span class="live"></span>On bench</span>' : ''}</h2>
+    <div class="detail-meta"><span>${u.batch}</span><span class="dotsep"></span><span>PCB rev C</span><span class="dotsep"></span><span class="mono">chip ${u.uid}</span><span class="dotsep"></span><span>fw ${u.fw || '—'}</span></div></div>
+    <div class="detail-actions">${btn('', { v: 'ghost', icon: 'i-copy', title: 'Copy serial' })}${failed ? btn('Send to rework', { icon: 'i-wrench', act: 'modal', arg: 'rework' }) : btn('Put on hold', { icon: 'i-clock' })}${btn('Open in bench', { v: 'primary', icon: 'i-scan', go: 'bench', arg: 'loaded' })}</div></div>
+  ${pn('', rail(u, times))}
+  <div class="stats">${stat('Stage', STG[u.stage], { sm: 1, d: `${u.stage + 1} of 10 · ${u.st}` })}${stat('Firmware', u.fw ? tag(u.fw) : '—', { sm: 1, d: u.fw ? 'reported by device · 09:40' : 'never flashed' })}${stat('Last test', u.last[1] === 'none' ? '—' : rk(u.last[1], u.last[1] === 'pass' ? 'Pass' : u.last[1] === 'fail' ? 'Fail' : 'Running'), { sm: 1, d: u.last[0] })}${stat('Device record', u.imei !== '—' ? `<a class="act" href="#" style="font-size:14px">Devices ›</a>` : '—', { sm: 1, d: u.imei !== '—' ? `<span class="mono">${u.imei}</span>` : 'created when the IMEI is read' })}</div>
+  ${tabs([['timeline', 'Timeline'], ['tests', 'Tests', u.stage >= 2 ? (u.stage >= 6 ? 26 : u.stage >= 4 ? 20 : 14) : 0], ['firmware', 'Firmware', u.stage >= 4 ? 2 : u.stage >= 1 ? 1 : 0], ['telemetry', 'Telemetry'], ['shoe', 'Shoe & shipping']], S.unitTab, 'tab-unit')}
+  <div class="grid2 detail"><div class="col">${tab}</div>
+    <div class="col">${side('Identity', `<dt>Chip UID</dt><dd><span class="mono">${u.uid}</span></dd><dt>IMEI</dt><dd><span class="mono">${u.imei}</span></dd><dt>ICCID</dt><dd><span class="mono">${u.stage >= 3 ? '8991…8901' : '—'}</span></dd><dt>SIM</dt><dd>${u.stage >= 3 ? 'Jio · <span class="mono">…8901</span>' : '—'}</dd><dt>Batch</dt><dd>${u.batch} · rev C</dd>`, { kv: 1 })}
+    ${side('Where it is', `<dt>Station</dt><dd>${u.st}</dd><dt>Probe</dt><dd>${u.stage < 7 && u.stage > 0 ? 'ST-LINK #1' : '—'}</dd><dt>Operator</dt><dd>${u.stage < 7 ? 'Meena' : '—'}</dd><dt>Updated</dt><dd>${fresh(u.up[0], u.up[1])}</dd>`, { kv: 1 })}</div></div>
+  <p class="note">Mockup: from Units, open SW-2209-QP4L (failed board tests), SW-2197-T3MA (functional tests running) or SW-2041-7K9Q (delivered, active).</p>`;
+}
+
+/* ---------------- BENCH ---------------- */
+const FL = [[0, '<span class="ag">[agent]</span> job FJ-8813 · STM32_Programmer_CLI v2.17.0'], [2, 'ST-LINK SN   : 0039002F3A51 (V3J7M2)'], [3, 'Voltage      : 3.29 V'], [4, 'Device ID    : 0x460 · STM32G07x/G08x · Flash 128 KB'], [8, 'Erasing sectors 0–45 … <span class="ok">done</span>'], [20, 'Opening stepwhere.ino.bin (1.2 · 92.4 KB) @ 0x08000000'], [22, 'Download in progress …'], [88, '<span class="ok">File download complete</span> · elapsed 00:00:03.412'], [90, 'Verifying …'], [97, '<span class="ok">Download verified successfully</span>'], [98, 'Option bytes: RDP level 0 (kept during QA)'], [100, '<span class="ag">[agent]</span> target reset · waiting for firmwareVersion 1.2 at ingest']];
+let tmr = null, tmr2 = null;
+const stopSim = () => { clearInterval(tmr); clearTimeout(tmr2); tmr = tmr2 = null; };
+const setBench = (st) => { stopSim(); S.bench = st; S.sim = { p: 0, li: 0, log: [], t: 0, gps: 0, steps: 0, pk: 0, tick: 0, wifi: 0 }; };
+function startSim() {
+  if (S.screen !== 'bench' || S.layout !== 'single') return;
+  const s = S.sim;
+  if (S.bench === 'flashing') {
+    tmr = setInterval(() => {
+      s.p = Math.min(100, s.p + 2);
+      while (s.li < FL.length && FL[s.li][0] <= s.p) s.log.push(FL[s.li++][1]);
+      upd();
+      if (s.p >= 100) { clearInterval(tmr); tmr2 = setTimeout(() => { setBench('testing'); render(); }, 1100); }
+    }, 80);
+  }
+  if (S.bench === 'testing') {
+    s.log = ['<span class="ag">[server]</span> watching IMEI 867946053102187 · suite Functional v4', '<span class="dim">[uart] [DEV][BOOT] Integrated Wi-Fi/cellular telemetry: 1.2</span>', '<span class="dim">[uart] [Modem] SIM READY · [IMEI] 867946053102187</span>'];
+    tmr = setInterval(() => {
+      s.tick++;
+      if (s.t < 9.4) { s.t = Math.min(9.4, +(s.t + 0.2).toFixed(1)); if (s.t >= 9.4) s.log.push('<span class="ok">[server] first packet accepted · 201 · uptimeMs 9412 · firmwareVersion 1.2</span>'); }
+      if (s.t >= 9.4 && s.wifi < 7 && s.tick % 6 === 0) { s.wifi++; if (s.wifi === 7) s.log.push('<span class="ok">[server] wifi.accessPoints 7 · location resolved ±62 m</span>'); }
+      if (s.gps < 192) {
+        s.gps = Math.min(192, s.gps + 4);
+        const pk = Math.floor(s.gps / 8);
+        if (s.t >= 9.4 && pk > s.pk) { s.pk = pk; s.log.push(`[TEL] seq=${pk} http=201 result=accepted sats=${Math.min(6, Math.floor(s.gps / 36))} steps=${s.steps}`); }
+        if (s.gps >= 192) s.log.push('<span class="ok">[server] valid GPS fix · 6 satellites · uptime 3:12</span>');
+      }
+      if (s.t >= 4 && s.steps < 20 && s.tick % 3 === 0) s.steps++;
+      upd();
+      if (s.t >= 9.4 && s.gps >= 192 && s.steps >= 20 && s.wifi >= 7) { clearInterval(tmr); s.log.push('<span class="ok">[server] Functional v4 · 6/6 passed</span>'); upd(); tmr2 = setTimeout(() => { setBench('pass'); render(); }, 1400); }
+    }, 100);
+  }
+}
+function upd() { const el = document.getElementById('bw'); if (!el) return; el.innerHTML = benchWork(); const c = el.querySelector('.console'); if (c) c.scrollTop = c.scrollHeight; }
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function unitStrip() {
+  const st = S.bench;
+  const fw = ['testing', 'pass', 'fail', 'assembly'].includes(st) ? '1.2' : 'qa-1.3';
+  return `<div class="unit-strip"><div><h3><span class="mono" style="font-size:16px">SW-2201-4XQ7</span>${st === 'fail' ? pill('Failed', 'breach') : pill('In QA', 'info')}${tag(fw)}</h3><div class="meta"><span>B-2610-A</span><span class="dotsep"></span><span>PCB rev C</span><span class="dotsep"></span><span class="mono">IMEI 867946053102187</span><span class="dotsep"></span><span>ST-LINK #1</span></div></div>${btn('Unit page', { sm: 1, icon: 'i-arrow-ur', go: 'unit', arg: 'SW-2201-4XQ7' })}</div>`;
+}
+function benchWork() {
+  const s = S.sim, st = S.bench;
+  if (st === 'idle') return `<div class="col" style="gap:14px">
+    <div><h3 style="font-size:var(--t-16);font-weight:600;display:flex;gap:8px;align-items:center">${ic('i-scan')}Scan a unit</h3><p class="note" style="margin-top:4px">Scan the QR on the board or the shoe, or type a serial. Scanning works from any screen.</p></div>
+    <div class="field is-focus scan-field">${ic('i-scan')}<input placeholder="SW-2201-4XQ7" />${btn('Load', { v: 'primary', act: 'bench', arg: 'loaded', kbd: '↵' })}</div>
+    <div class="or">or</div>
+    <div class="detect"><div><b>${ic('i-cpu')}New board on ST-LINK #1</b><p><span class="mono">0039 2F3A 5143 91C4</span> · STM32G071CB · 3.29 V · not registered yet</p></div>${btn('Register as SW-2213', { icon: 'i-plus', act: 'bench', arg: 'loaded' })}</div>
+    ${oq('Is there a printed serial or QR on the PCB? If not, the bench prints one when the board is registered.')}</div>`;
+  if (st === 'loaded') return `<div class="col" style="gap:14px">${unitStrip()}${rail(U[0], null, true)}
+    <div class="next"><span class="label">Next step · 4 of 10</span><h3>Flash production firmware</h3>
+      <dl class="kv"><dt>Build</dt><dd>${tag('1.2')}<span class="muted">released · stepwhere.ino · 92.4 KB · sha256 9f3c…a7e1</span></dd><dt>Target</dt><dd>STM32G071CB · ST-LINK #1 (SWD) · 0x08000000</dd><dt>Then</dt><dd>Functional tests v4 start when the device reports 1.2</dd></dl>
+      <div class="row" style="gap:8px">${btn('Run next step', { v: 'primary', lg: 1, icon: 'i-play', act: 'bench', arg: 'flashing', kbd: '↵' })}${btn('Run all bench steps', { lg: 1 })}<button class="select-trigger fr" style="height:40px">Build: 1.2${ic('i-chev-d', 'i-sm')}</button></div></div>
+    <div class="row" style="gap:8px;font-size:var(--t-12);color:var(--ink-3)">${rk('pass', 'Board bring-up v3')} passed 14/14, 4 minutes ago · <a class="act" href="#">view run</a></div></div>`;
+  if (st === 'flashing') {
+    const p = s.p, ph = [['Connect', 5], ['Erase', 20], ['Program', 88], ['Verify', 97], ['Reset', 100]];
+    let prev = 0;
+    return `<div class="col" style="gap:14px">${unitStrip()}
+      <div class="row" style="justify-content:space-between"><b class="ink" style="display:flex;gap:8px;align-items:center">${ic('i-zap')}Flashing 1.2</b><span class="num ink" style="font-weight:600">${p}%</span></div>
+      <div class="prog${p >= 100 ? ' ok' : ''}"><i style="width:${p}%"></i></div>
+      <div class="phase-row">${ph.map(([l, e]) => { const c = p >= e ? pill(l, 'ok') : p >= prev ? `<span class="live-badge"><span class="live"></span>${l}</span>` : `<span class="pill no-dot pill-muted">${l}</span>`; prev = e; return c; }).join('')}</div>
+      <div class="console">${s.log.join('\n')}</div>
+      <div class="row" style="gap:10px">${btn('Cancel', { icon: 'i-x', v: 'ghost' })}<span class="note">Esc cancels. A board cancelled mid-program is left erased.</span></div></div>`;
+  }
+  if (st === 'testing') {
+    const gd = s.t >= 9.4, pd = s.gps >= 192, sd = s.steps >= 20, wd = s.wifi >= 7;
+    const sats = Math.min(6, Math.floor(s.gps / 36)), exp = Math.max(1, Math.floor(s.gps / 8));
+    const run = (l) => `<span class="live-badge"><span class="live"></span>${l}</span>`;
+    return `<div class="col" style="gap:14px">${unitStrip()}
+      <div class="row" style="justify-content:space-between"><b class="ink" style="display:flex;gap:8px;align-items:center">${ic('i-activity')}Functional tests v4</b><span class="note">Measured by the server from live telemetry over GSM</span></div>
+      <div class="tcards">
+        <div class="tc${gd ? ' pass' : ''}"><div class="top"><span class="nm">${ic('i-signal')}GSM first packet</span>${gd ? pill('Pass', 'ok') : run('Waiting')}</div><div class="big">0:${s.t.toFixed(1).padStart(4, '0')}</div><div class="prog${gd ? ' ok' : ''}"><i style="width:${(s.t / 15) * 100}%"></i></div><span class="lim">uptime limit 0:15 · CSQ 18 · fw 1.2</span></div>
+        <div class="tc${pd ? ' pass' : ''}"><div class="top"><span class="nm">${ic('i-sat')}GPS valid fix</span>${pd ? pill('Pass', 'ok') : run('Acquiring')}</div><div class="big">${fmt(s.gps)}</div><div class="prog${pd ? ' ok' : ''}"><i style="width:${(s.gps / 420) * 100}%"></i></div><span class="lim">limit 7:00 · ${sats} satellites, need 4</span></div>
+        <div class="tc${sd ? ' pass' : s.t >= 4 ? ' act' : ''}"><div class="top"><span class="nm">${ic('i-shoe')}Step count</span>${sd ? pill('Pass', 'ok') : s.t >= 4 ? pill('Your turn', 'caution') : '<span class="pill no-dot pill-muted">Next</span>'}</div><div class="big">${s.steps}<small> / 20</small></div>${!sd && s.t >= 4 ? `<span class="instr">${ic('i-hand')}Shake the board 20 times now</span>` : '<span class="lim">tolerance ±2 · LIS2DS12 counter</span>'}</div>
+        <div class="tc${wd ? ' pass' : ''}"><div class="top"><span class="nm">${ic('i-wifi')}Wi-Fi fallback</span>${wd ? pill('Pass', 'ok') : run(gd ? 'Scanning' : 'Waiting')}</div><div class="big">${s.wifi}<small> APs</small></div><span class="lim">${wd ? 'resolved ±62 m · need ≤ 150 m' : 'AT+WIFIAPSCAN in telemetry · need ≥ 3'}</span></div>
+        <div class="tc${pd ? ' pass' : ''}"><div class="top"><span class="nm">${ic('i-clock')}Cadence</span>${pd ? pill('Pass', 'ok') : run('Measuring')}</div><div class="big">${gd ? Math.max(0, exp - (exp > 12 ? 1 : 0)) : 0}<small> / ${gd ? exp : 0}</small></div><span class="lim">packets every 8 s · need ≥ 90%</span></div>
+      </div>
+      <div class="console" style="height:150px">${s.log.join('\n')}</div></div>`;
+  }
+  if (st === 'pass') return `<div class="col" style="gap:14px">${unitStrip()}
+    <div class="result pass"><span class="circ">${ic('i-check')}</span><span class="word">PASS</span><span class="meta">Functional tests v4 · 6/6 · 3 min 41 s</span>
+      <div class="rlist"><div><span>${rk('pass', 'GSM first packet')}</span><b>9.4 s</b></div><div><span>${rk('pass', 'Firmware reports 1.2')}</span><b>1.2</b></div><div><span>${rk('pass', 'GPS valid fix')}</span><b>3:12 · 6 sats</b></div><div><span>${rk('pass', 'Step count')}</span><b>20 / 20</b></div><div><span>${rk('pass', 'Wi-Fi fallback')}</span><b>7 APs · ±62 m</b></div><div><span>${rk('pass', 'Cadence')}</span><b>96%</b></div></div></div>
+    <div class="next"><span class="label">Next step · 6 of 10</span><h3>Assembly: pair with a shoe</h3><div class="row" style="gap:8px">${btn('Continue to assembly', { v: 'primary', lg: 1, icon: 'i-arrow-r', act: 'bench', arg: 'assembly', kbd: '↵' })}${btn('Print unit label', { lg: 1, icon: 'i-printer' })}${btn('Scan next unit', { lg: 1, v: 'ghost', icon: 'i-scan', act: 'bench', arg: 'idle' })}</div></div></div>`;
+  if (st === 'fail') return `<div class="col" style="gap:14px">${unitStrip()}
+    <div class="result fail"><span class="circ">${ic('i-x')}</span><span class="word">FAIL</span><span class="why">GPS valid fix not reached within 7:00</span><span class="meta">best 2 satellites · the other 5 tests passed</span>
+      <div class="rlist"><div><span>${rk('pass', 'GSM first packet')}</span><b>9.4 s</b></div><div><span>${rk('fail', 'GPS valid fix')}</span><b>— · 2 sats</b></div><div><span>${rk('pass', 'Step count')}</span><b>20 / 20</b></div><div><span>${rk('pass', 'Wi-Fi fallback')}</span><b>7 APs · ±62 m</b></div></div></div>
+    ${insight('3 of the last 20 units on <b>Bench 2</b> failed GPS. Check the antenna fixture or the bench’s sky view before reworking this unit.')}
+    <div><label class="field-label">Note for the timeline</label><div class="field area"><span>e.g. GPS antenna connector looks loose</span></div></div>
+    <div class="row" style="gap:8px">${btn('Retest GPS only', { v: 'primary', icon: 'i-refresh', act: 'bench', arg: 'testing', kbd: 'R' })}${btn('Send to rework', { icon: 'i-wrench', act: 'modal', arg: 'rework' })}${btn('Scan next unit', { v: 'ghost', icon: 'i-scan', act: 'bench', arg: 'idle' })}</div></div>`;
+  if (st === 'assembly') return `<div class="col" style="gap:14px">${unitStrip()}
+    <div class="row" style="justify-content:space-between"><b class="ink" style="display:flex;gap:8px;align-items:center">${ic('i-shoe')}Pair SW-2201-4XQ7 with a shoe</b><span class="tag" style="font-family:var(--font-sans)">Step 6 of 10</span></div>
+    <div class="grid2 even"><div class="hw"><span class="ico">${ic('i-cpu')}</span><div><div class="t">Device</div><div class="s mono">SW-2201-4XQ7 · 1.2</div></div><span class="r">${rk('pass', 'Scanned')}</span></div><div class="hw"><span class="ico">${ic('i-tag')}</span><div><div class="t">Shoe label</div><div class="s mono">SHOE-UK7-L-0412</div></div><span class="r">${rk('pass', 'Scanned')}</span></div></div>
+    <div class="fgrid">
+      <div><label class="field-label">SKU</label><button class="select-trigger fr" style="width:100%">StepKids Runner · Navy${ic('i-chev-d', 'i-sm')}</button></div>
+      <div><label class="field-label">Size</label><button class="select-trigger fr" style="width:100%">UK 7${ic('i-chev-d', 'i-sm')}</button></div>
+      <div><label class="field-label">Side</label>${seg([['l', 'Left'], ['r', 'Right']], 'l')}</div>
+      <div><label class="field-label">Pair code</label><div class="field val"><span class="v mono">PR-0412</span></div><p class="field-help">Both shoes of a pair share it</p></div>
+    </div>
+    ${oq('One device per shoe, or one per pair? This decides whether Side and Pair code exist at all.')}
+    <div class="row" style="gap:8px">${btn('Confirm and start final test', { v: 'primary', lg: 1, icon: 'i-check', kbd: '↵' })}${btn('Scan a different shoe', { lg: 1, icon: 'i-scan' })}</div></div>`;
+  return '';
+}
+function vBench() {
+  const states = [['idle', '1 Scan'], ['loaded', '2 Unit loaded'], ['flashing', '3 Flashing'], ['testing', '4 Live tests'], ['pass', '5a Pass'], ['fail', '5b Fail'], ['assembly', '6 Assembly']];
+  const single = `<div class="mock-bar"><b>Prototype</b> bench states ${states.map(([k, l]) => `<button type="button" aria-pressed="${S.bench === k}" data-act="bench" data-arg="${k}">${l}</button>`).join('')}<span>Flash and live tests play on their own</span></div>
+  <div class="grid-bench"><section class="pn"><div class="bd" id="bw" style="padding:20px">${benchWork()}</div></section>
+    <div class="col">
+      ${side('Bench 1', `<div class="col" style="gap:8px"><div class="row" style="gap:8px;font-size:var(--t-12);color:var(--ink-2)"><span class="live"></span>Agent online · v0.4.2 · Windows 11</div>
+        <div class="hw"><span class="ico">${ic('i-usb')}</span><div><div class="t">ST-LINK V3 #1</div><div class="s">SWD · G071 · 3.29 V</div></div><span class="r">${pill('Ready', 'ok')}</span></div>
+        <div class="hw"><span class="ico">${ic('i-terminal')}</span><div><div class="t">USB-TTL · COM5</div><div class="s">PB6/PB7 · 115200</div></div><span class="r">${pill('Streaming', 'info')}</span></div>
+        <p class="note">STM32CubeProgrammer 2.17.0</p></div>`, { right: btn('', { v: 'ghost', sm: 1, icon: 'i-arrow-ur', go: 'stations' }) })}
+      ${side('Recent at this bench', `<div class="lst"><div class="li"><span class="mono">SW-2200-4XQ6</span><span class="r">${rk('pass', 'Functional')}<span class="muted num">6m</span></span></div><div class="li"><span class="mono">SW-2209-QP4L</span><span class="r">${rk('fail', 'Board')}<span class="muted num">21m</span></span></div><div class="li"><span class="mono">SW-2198-T3MB</span><span class="r">${rk('pass', 'Final')}<span class="muted num">33m</span></span></div></div><p class="note" style="margin-top:8px">Today: 34 units · 2 failed</p>`)}
+      ${side('Keyboard', `<div class="lst kbd-list"><div class="li"><span class="kbd">↵</span>Run next step</div><div class="li"><span class="kbd">R</span>Retest failed test</div><div class="li"><span class="kbd">N</span>Add note</div><div class="li"><span class="kbd">Esc</span>Cancel, scan next</div></div>`)}
+    </div></div>`;
+  const slots = `<div class="slots">
+    <div class="slot"><div class="top"><b>Slot 1</b><span class="note">ST-LINK #1</span></div><div class="row" style="gap:8px"><span class="mono ink">SW-2201-4XQ7</span><span class="live-badge"><span class="live"></span>Flashing</span></div><div class="prog"><i style="width:62%"></i></div><span class="note">1.2 · 62%</span></div>
+    <div class="slot"><div class="top"><b>Slot 2</b><span class="note">ST-LINK #2</span></div><div class="row" style="gap:8px"><span class="mono ink">SW-2202-4XQ8</span><span class="live-badge"><span class="live"></span>GPS 2:10</span></div><div class="prog"><i style="width:31%"></i></div><span class="note">Functional v4 · 3/6 done</span></div>
+    <div class="slot pass"><div class="top"><b>Slot 3</b><span class="note">ST-LINK #3</span></div><div class="row" style="gap:8px"><span class="mono ink">SW-2203-4XQ9</span>${pill('Pass', 'ok')}</div><span class="note">Functional v4 · 6/6 · ready to unplug</span>${btn('Next unit', { sm: 1, icon: 'i-scan' })}</div>
+    <div class="slot empty">${ic('i-plus')}<b class="ink" style="margin-top:6px">Slot 4</b><span class="note">Put a board on the probe, or scan one</span></div></div>
+    ${oq('How many units a day? Multi-slot needs one ST-LINK and one USB-TTL per slot, or a pogo-pin jig.')}`;
+  return `${head('Bench', 'Bench 1 · Ravi · scan, flash and test one unit at a time, or one per slot', `<button class="select-trigger fr"><span class="live"></span>Bench 1${ic('i-chev-d', 'i-sm')}</button>${seg([['single', 'Single'], ['slots', 'Multi-slot']], S.layout, 'layout')}`)}${S.layout === 'single' ? single : slots}`;
+}
+
+/* ---------------- RUNS ---------------- */
+const RUNS = [['R-2304', 'SW-2201-4XQ7', 'Board bring-up v3', '14/14', 'pass', '2m 21s', 'Bench 1', 'Ravi', 'UART', '14:02'], ['R-2303', 'SW-2188-7B09', 'Functional v4', '5/6', 'fail', '7m 18s', 'Bench 2', 'Meena', 'Cloud', '13:44'], ['R-2302', 'SW-2197-T3MA', 'Functional v4', '3/6', 'run', '—', 'Bench 1', 'Ravi', 'Cloud', '13:58'], ['R-2301', 'SW-2171-ZN5E', 'Final v2', '5/6', 'fail', '6m 02s', 'Bench 3', 'Meena', 'Cloud + manual', '13:01'], ['R-2300', 'SW-2176-HH2C', 'Functional v4', '6/6', 'pass', '3m 41s', 'Bench 2', 'Meena', 'Cloud', '12:47'], ['R-2299', 'SW-2209-QP4L', 'Board bring-up v3', '6/14', 'fail', '0m 48s', 'Bench 1', 'Ravi', 'UART', '13:37'], ['R-2298', 'SW-2168-L9YT', 'Final v2', '6/6', 'pass', '5m 10s', 'Bench 3', 'Meena', 'Cloud + manual', '11:20']];
+function vRuns() {
+  const f = RUNS.filter((r) => S.runsTab === 'all' || r[4] === S.runsTab);
+  return `${head('Test runs', '2,304 runs · 3 running now', btn('Export', { icon: 'i-download' }))}
+  ${tabs([['all', 'All', '2,304'], ['run', 'Running', 3], ['fail', 'Failed', 7]], S.runsTab, 'tab-runs')}
+  <div class="toolbar">${search('Run, unit, IMEI')}${chip('Suite')}${chip('Station', 'Bench 1, Bench 2')}${chip('Operator')}${btn('Reset', { v: 'ghost', sm: 1 })}</div>
+  ${tbl(['Run', 'Unit', 'Suite', 'Result', ['Duration', 'c-num'], 'Station', 'Operator', 'Source', 'Started'], f.map((r) => `<tr class="click${S.sheet === r[0] ? ' is-selected' : ''}" data-act="sheet" data-arg="${r[0]}"><td><span class="mono">${r[0]}</span></td><td><span class="primary-cell mono">${r[1]}</span></td><td>${r[2]}</td><td>${rk(r[4], r[4] === 'pass' ? 'Passed' : r[4] === 'fail' ? 'Failed' : 'Running')}<span class="sub-cell">${r[3]}</span></td><td class="c-num">${r[5]}</td><td>${r[6]}</td><td><span class="cell-with-av"><span class="avatar plain">${r[7][0]}</span>${r[7]}</span></td><td><span class="tag" style="font-family:var(--font-sans)">${r[8]}</span></td><td class="num">${r[9]}</td></tr>`).join(''), pager(`Showing 1–${f.length} of 2,304`, ['1', '2', '3', '…', '116']))}
+  <p class="note">Click a run to open its detail panel.</p>`;
+}
+function sheetRun() {
+  return `<div class="scrim" data-close="1"><div class="sheet">
+    <div class="sh-h"><div><h4><span class="mono" style="font-size:15px">R-2303</span>${pill('Failed', 'breach')}</h4><p><span class="mono">SW-2188-7B09</span> · Functional v4 · Bench 2 · Meena · 13:44 → 13:51</p></div>${btn('', { v: 'ghost', sm: 1, icon: 'i-x', act: 'close' })}</div>
+    <div class="sh-b">
+      <div class="stats n3">${stat('Tests', '5', { unit: '/ 6' })}${stat('Duration', '7:18', { unit: 'min' })}${stat('Firmware', tag('1.2'), { sm: 1 })}</div>
+      ${tbl(['Test', 'Pass when', 'Measured', ''], [['GSM first packet', '≤ 15 s', '9.4 s', 'pass'], ['Firmware reports version', '= 1.2', '1.2', 'pass'], ['GPS valid fix', '≤ 7:00 · ≥ 4 sats', '— · 2 sats', 'fail'], ['Step count', '20 ± 2', '20', 'pass'], ['Wi-Fi fallback', '≤ 150 m', '62 m', 'pass'], ['Cadence', '≥ 90%', '97%', 'pass']].map((r) => `<tr><td><span class="ink">${r[0]}</span></td><td>${r[1]}</td><td><span class="mono">${r[2]}</span></td><td>${rk(r[3], '')}</td></tr>`).join(''))}
+      <p class="note">Thresholds are copied onto the run, so editing a suite later never changes past results.</p>
+      <div><span class="label">Log excerpt</span><div class="console" style="height:170px;margin-top:8px"><span class="ag">[server]</span> watching IMEI 867946053102142 · Functional v4
+<span class="ok">[server] first packet accepted · 201 · uptimeMs 9412 · firmwareVersion 1.2</span>
+[TEL] seq=12 http=201 result=accepted sats=1 steps=0
+<span class="ok">[server] wifi.accessPoints 6 · location resolved ±62 m</span>
+[TEL] seq=30 http=201 result=accepted sats=2 steps=20
+[TEL] seq=52 http=201 result=accepted sats=2 steps=20
+<span class="er">[server] GPS fix timeout · uptime 7:00 · best 2 satellites</span></div></div>
+    </div>
+    <div class="sh-f">${btn('Download log', { v: 'ghost', icon: 'i-download' })}${btn('Open unit', { go: 'unit', arg: 'SW-2188-7B09' })}${btn('Retest', { v: 'primary', icon: 'i-refresh', go: 'bench', arg: 'testing' })}</div>
+  </div></div>`;
+}
+
+/* ---------------- SUITES ---------------- */
+const SUITES = { board: ['Board bring-up', 'v3', 'Board tests', 'QA firmware', BOARD], functional: ['Functional', 'v4', 'Functional tests', 'Production firmware', FUNC], final: ['Final (in shoe)', 'v2', 'Final test', 'Production firmware', FINAL] };
+function vSuites() {
+  const s = SUITES[S.suite];
+  const next = s[1].replace(/\d+/, (m) => +m + 1);
+  const notes = { functional: 'GSM ≤ 15 s is now timed with the device’s own <span class="mono">uptimeMs</span>. Should the clock start at boot, or at the first AT response? 15 s to the first accepted packet is tight for the N706.', board: 'Board tests need more serial commands in the QA firmware. The debug UART already accepts commands (<span class="mono">CELLPROBE</span>), so a <span class="mono">QA …</span> command set can follow the same pattern.', final: 'Steps while worn: does the operator walk in the shoe, or use a shake rig?' };
+  return `${head('Test suites', 'What runs at each stage, through which channel, and what counts as a pass', btn('New suite', { icon: 'i-plus' }))}
+  <div class="grid2 side">
+    ${side('Suites', `<div class="col" style="gap:2px">${Object.entries(SUITES).map(([k, x]) => `<button type="button" class="suite-i fr" aria-current="${S.suite === k}" data-act="suite" data-arg="${k}"><b>${x[0]}<span class="tag">${x[1]}</span></b><span>${x[2]} · ${x[4].length} tests · ${x[3]}</span></button>`).join('')}</div>`)}
+    <div class="col">
+      <div class="page-head"><div><h2 style="font-size:var(--t-16);display:flex;gap:8px;align-items:center">${s[0]} <span class="tag">${s[1]} · published</span>${pill('Draft changes', 'caution')}</h2><p>Runs at <span class="ink">${s[2]}</span> on <span class="ink">${s[3]}</span>. A blocking failure stops the unit at this stage.</p></div><div class="acts">${btn('Discard', { v: 'ghost' })}${btn(`Publish ${next}`, { v: 'primary' })}</div></div>
+      ${tbl(['On', 'Test', 'Channel', 'Pass when', ['Retries', 'c-num'], 'Blocking'], s[4].map((r, i) => `<tr><td><button class="switch fr" aria-checked="true"><span class="knob"></span></button></td><td><span class="ink">${r[0]}</span></td><td><span class="tag" style="font-family:var(--font-sans)">${r[1]}</span></td><td><div class="field thr"><span>${r[2]}</span></div></td><td class="c-num">${r[1].startsWith('Cloud') ? 1 : 0}</td><td><button class="switch fr" aria-checked="${!(S.suite !== 'board' && i === s[4].length - 1)}"><span class="knob"></span></button></td></tr>`).join(''))}
+      <p class="note">Each test is implemented in code, in the bench agent or the server. Only on/off, thresholds and retries are editable here. Publishing creates a new version; past runs keep theirs.</p>
+      ${oq(notes[S.suite])}
+    </div></div>`;
+}
+
+/* ---------------- FIRMWARE ---------------- */
+function vFirmware() {
+  const R = {
+    prod: [['1.3-rc1', 'Draft', 'stepwhere.ino', 'rev C', '94.0 KB', 'b71e…0c3d', 'e4f1a2c', '0', 'CI · 17 Oct'], ['1.2', 'Released', 'stepwhere.ino', 'rev C', '92.4 KB', '9f3c…a7e1', '70c622b', '402', 'Aryan · 12 Oct'], ['1.1', 'Deprecated', 'stepwhere.ino', 'rev B, C', '90.8 KB', '47d0…11b9', '98c0e7f', '47', 'Aryan · 28 Sep']],
+    qa: [['qa-1.3', 'Released', 'stepwhere.qa.ino', 'rev C', '88.1 KB', 'c02a…77f0', '5d6e7f8', '126', 'Aryan · 10 Oct'], ['qa-1.2', 'Deprecated', 'stepwhere.qa.ino', 'rev B, C', '86.9 KB', 'e9a1…4b2c', '3c4d5e6', '0', 'Aryan · 30 Sep']],
+    dev: [['1.3-dev-wifi-quiet', 'Bench only', 'stepwhere.dev.ino', 'rev C', '97.6 KB', '5a1c…e019', '5c86e7f', '3', 'Aryan · 14 Oct'], ['wifi-exp-1', 'Bench only', 'stepwhere.experiment-wifi.ino', 'rev C', '71.3 KB', 'aa02…31d7', 'b8c25d4', '1', 'Aryan · 9 Oct']],
+  }[S.fw];
+  const tone = { Draft: 'unset', Released: 'ok', Deprecated: 'caution', 'Bench only': 'info' };
+  return `${head('Firmware', 'Every binary a bench can flash. Built from apps/firmware, stored in S3, SHA-256 checked before each flash', `${btn('Build from main', { icon: 'i-git' })}${btn('Upload build', { v: 'primary', icon: 'i-upload', act: 'modal', arg: 'upload' })}`)}
+  <div class="stats">${stat('Production', tag('1.2'), { sm: 1, d: '402 units · released 12 Oct' })}${stat('QA firmware', tag('qa-1.3'), { sm: 1, d: '126 units in QA' })}${stat('Outdated in field', '47', { d: '<span class="down">on 1.1</span> · deprecated' })}${stat('Version reporting', '100', { unit: '%', d: 'devices send firmwareVersion', meter: 100, mc: 'var(--ok)' })}</div>
+  ${tabs([['prod', 'Production', 3], ['qa', 'QA', 2], ['dev', 'Dev & experiments', 2]], S.fw, 'fw')}
+  ${tbl(['Version', 'Status', 'Sketch', 'HW', ['Size', 'c-num'], 'SHA-256', 'Commit', ['Units', 'c-num'], 'Uploaded', ['', 'c-act']], R.map((r) => `<tr><td>${tag(r[0])}</td><td>${pill(r[1], tone[r[1]])}</td><td><span class="mono">${r[2]}</span></td><td>${r[3]}</td><td class="c-num">${r[4]}</td><td><span class="mono">${r[5]}</span></td><td><span class="mono" style="color:var(--act)">${r[6]}</span></td><td class="c-num">${r[7]}</td><td>${r[8]}</td><td class="c-act">${btn('', { v: 'ghost', sm: 1, icon: 'i-more' })}</td></tr>`).join(''))}
+  ${S.fw === 'dev' ? oq('Should the dev build (Wi-Fi and boot diagnostics) be the QA firmware, or does QA get its own sketch with a test command set?') : oq('OTA over GSM is out of scope for now. The G071 has a single flash bank, so OTA needs its own bootloader design.')}`;
+}
+
+/* ---------------- STATIONS ---------------- */
+function vStations() {
+  const hw = (icon, t, s, b) => `<div class="hw"><span class="ico">${ic(icon)}</span><div><div class="t">${t}</div><div class="s">${s}</div></div><span class="r">${b}</span></div>`;
+  const st = (name, live, meta, h, job, today) => side(`<span class="row" style="gap:8px">${live === 'off' ? fresh('2h ago', 'f-stale') : '<span class="live"></span>'}${name}</span>`, `<div class="col" style="gap:8px"><p class="note">${meta}</p>${h}<div class="row" style="justify-content:space-between;font-size:var(--t-12)"><span class="ink">${job}</span><span class="muted">${today}</span></div></div>`, { right: btn('', { v: 'ghost', sm: 1, icon: 'i-more' }) });
+  return `${head('Stations', '2 of 3 online · the agent connects out to the server, so benches can sit on any network', btn('Pair station', { v: 'primary', icon: 'i-plus', act: 'modal', arg: 'pair' }))}
+  <div class="grid2 even">
+    ${st('Bench 1', 'on', 'Agent 0.4.2 · Windows 11 · CubeProgrammer 2.17.0 · heartbeat 2 s ago', hw('i-usb', 'ST-LINK V3 · <span class="mono">0039002F3A51</span>', 'SWD · STM32G071 · 3.29 V', pill('Ready', 'ok')) + hw('i-terminal', 'CP2102 · COM5', 'debug UART PB6/PB7 · 115200', pill('Streaming', 'info')), 'Idle · waiting for scan', '34 units today')}
+    ${st('Bench 2', 'on', 'Agent 0.4.2 · macOS 15 · CubeProgrammer 2.17.0 · heartbeat 1 s ago', hw('i-usb', 'ST-LINK V2 · <span class="mono">066DFF48</span>', 'SWD · STM32G071 · 3.31 V', '<span class="live-badge"><span class="live"></span>Flashing</span>') + hw('i-terminal', 'FTDI · tty.usbserial-A10', 'debug UART PB6/PB7 · 115200', pill('Streaming', 'info')), 'Flashing <span class="mono">SW-2204-9KD2</span> · 62%', '28 units today')}
+    ${st('Line jig · Raspberry Pi', 'off', 'Agent 0.4.1 · Raspberry Pi OS · last heartbeat 2 h ago', hw('i-usb', '4 × ST-LINK V3 (pogo jig)', 'last seen 2 h ago', pill('Unknown', 'muted')), `${pill('Offline', 'muted')} <span class="muted" style="margin-left:6px">update agent to 0.4.2</span>`, '0 today')}
+    ${side('How a station works', `<div class="phase" style="background:none;box-shadow:none;padding:0"><ul>
+      <li><div><b>Install the agent and pair it</b><span>One command with a pairing code from here. The agent keeps a station token.</span></div></li>
+      <li><div><b>It reports its hardware</b><span>ST-LINK probes with target voltage and chip ID, plus serial ports, every few seconds.</span></div></li>
+      <li><div><b>The admin sends jobs</b><span>Flash a build (from S3, SHA checked) or run a UART suite. Progress and logs stream back live.</span></div></li></ul></div>`)}
+  </div>`;
+}
+
+/* ---------------- SHIPPING ---------------- */
+function vShipping() {
+  const T = [['ready', 'Ready to ship', 64], ['shipped', 'Shipped', 38], ['active', 'Delivered · active', 212], ['offline', 'Delivered · offline', 33]];
+  let body = '';
+  if (S.shipTab === 'ready') {
+    const R = [['SW-2168-L9YT', 'SHOE-UK7-L-0412', 'PR-0412 · L', 'UK 7', 'Today 10:58'], ['SW-2169-L9YU', 'SHOE-UK7-R-0412', 'PR-0412 · R', 'UK 7', 'Today 10:52'], ['SW-2163-P0XA', 'SHOE-UK5-L-0398', 'PR-0398 · L', 'UK 5', 'Yesterday'], ['SW-2164-P0XB', 'SHOE-UK5-R-0398', 'PR-0398 · R', 'UK 5', 'Yesterday']];
+    body = tbl([[cbx(false), 'c-check'], 'Unit', 'Shoe', 'Pair · side', 'Size', 'Final test', 'Ready since'], R.map((r) => `<tr class="click${S.ssel.has(r[0]) ? ' is-selected' : ''}" data-act="ssel" data-arg="${r[0]}"><td class="c-check">${cbx(S.ssel.has(r[0]))}</td><td><span class="primary-cell mono">${r[0]}</span></td><td><span class="mono">${r[1]}</span></td><td>${r[2]}</td><td>${r[3]}</td><td>${rk('pass', '6/6')}</td><td>${r[4]}</td></tr>`).join(''), pager('Showing 1–4 of 64', ['1', '2', '…', '16']));
+    if (S.ssel.size) body += `<div class="bulk bulk-float" style="bottom:28px;z-index:5"><span class="n">${cbx(true)}<b>${S.ssel.size}</b> selected</span><span class="sep"></span>${btn('Print labels', { v: 'ghost', sm: 1, icon: 'i-printer' })}${btn('Create shipment', { v: 'ghost', sm: 1, icon: 'i-truck', act: 'modal', arg: 'ship' })}<span class="sep"></span>${btn('', { v: 'ghost', sm: 1, icon: 'i-x', act: 'sclear' })}</div>`;
+  }
+  if (S.shipTab === 'shipped') body = tbl(['Shipment', 'Units', 'Customer', 'Courier · tracking', 'Shipped', 'Status', ['', 'c-act']], `<tr><td><span class="mono primary-cell">ORD-1043</span></td><td>2 · PR-0371</td><td>Mehta · Pune</td><td>Delhivery · <span class="mono">1593 2210 4471</span></td><td>15 Oct</td><td>${pill('Out for delivery', 'info')}</td><td>${btn('Mark delivered', { sm: 1 })}</td></tr><tr><td><span class="mono primary-cell">ORD-1041</span></td><td>2 · PR-0365</td><td>Iyer · Chennai</td><td>Blue Dart · <span class="mono">7782 1190 33</span></td><td>14 Oct</td><td>${pill('In transit', 'info')}</td><td>${btn('Mark delivered', { sm: 1 })}</td></tr><tr><td><span class="mono primary-cell">B2B-0007</span></td><td>20</td><td>Little Steps School</td><td>Hand delivery</td><td>13 Oct</td><td>${pill('Awaiting confirmation', 'caution')}</td><td>${btn('Mark delivered', { sm: 1 })}</td></tr>`) + oq('How do we learn a unit was delivered: marked by hand, from a courier API, or when the customer binds the device in the app?');
+  if (S.shipTab === 'active') body = tbl(['Unit', 'Bound to', 'Family', 'Firmware', 'Status', 'Last fix', 'Delivered'], `<tr><td><span class="primary-cell mono">SW-2041-7K9Q</span></td><td><span class="cell-with-av"><span class="avatar plain">A</span>Aarav M.</span></td><td>Mehta</td><td>${tag('1.2')}</td><td>${pill('Online', 'ok')}</td><td>${fresh('12s ago', 'f-live')}</td><td>16 Oct</td></tr><tr><td><span class="primary-cell mono">SW-2047-2M4D</span></td><td><span class="cell-with-av"><span class="avatar plain">I</span>Ira S.</span></td><td>Sharma</td><td>${tag('1.2')}</td><td>${pill('Online', 'ok')}</td><td>${fresh('4m ago', 'f-recent')}</td><td>15 Oct</td></tr><tr><td><span class="primary-cell mono">SW-1876-HH2C</span></td><td><span class="cell-with-av"><span class="avatar plain">V</span>Vihaan D.</span></td><td>Desai</td><td>${tag('1.1')}</td><td>${pill('Stale', 'caution')}</td><td>${fresh('2h ago', 'f-stale')}</td><td>2 Oct</td></tr>`) + '<p class="note">Active and offline come from the existing device status and freshness. Nothing new is stored for them.</p>';
+  if (S.shipTab === 'offline') body = tbl(['Unit', 'Bound to', 'Last fix', 'Last battery', 'Activation', ['', 'c-act']], `<tr><td><span class="primary-cell mono">SW-1654-C1VU</span></td><td><span class="cell-with-av"><span class="avatar plain">D</span>Diya N.</span></td><td>${fresh('3d ago', 'f-off')}</td><td><span style="color:var(--caution)">4%</span> · 3.52 V</td><td>${pill('Activated', 'ok')}</td><td>${btn('Contact family', { sm: 1 })}</td></tr><tr><td><span class="primary-cell mono">SW-2109-K6GF</span></td><td><span class="muted">Unbound</span></td><td>${fresh('never', 'f-off')}</td><td>—</td><td>${pill('Never activated', 'caution')}</td><td>${btn('Contact customer', { sm: 1 })}</td></tr><tr><td><span class="primary-cell mono">SW-1702-K6GE</span></td><td><span class="cell-with-av"><span class="avatar plain">A</span>Arjun B.</span></td><td>${fresh('9d ago', 'f-off')}</td><td>61% · 3.91 V</td><td>${pill('Activated', 'ok')}</td><td>${btn('Contact family', { sm: 1 })}</td></tr>`) + oq('When does a delivered unit count as offline: no telemetry for 24 h, or 72 h? The freshness scale calls anything over 24 h offline.');
+  return `${head('Shipping', '64 ready · 38 in transit · 245 delivered', btn('Create shipment', { v: 'primary', icon: 'i-truck', act: 'modal', arg: 'ship' }))}${tabs(T, S.shipTab, 'tab-ship')}${body}`;
+}
+
+/* ---------------- dialogs ---------------- */
+function modal() {
+  const fd = (l, v, o = {}) => `<div><label class="field-label">${l}</label>${o.sel ? `<button class="select-trigger fr" style="width:100%">${v}${ic('i-chev-d', 'i-sm')}</button>` : `<div class="field val"><span class="v${o.mono ? ' mono' : ''}">${v}</span>${o.suffix ? `<span class="suffix">${o.suffix}</span>` : ''}</div>`}${o.help ? `<p class="field-help">${o.help}</p>` : ''}</div>`;
+  const wrap = (t, d, b, f) => `<div class="scrim" data-close="1"><div class="dialog"><div class="dialog-body"><h4>${t}</h4><p>${d}</p>${b}</div><div class="dialog-foot">${btn('Cancel', { v: 'ghost', act: 'close' })}${f}</div></div></div>`;
+  switch (S.modal) {
+    case 'upload': return wrap('Upload firmware build', 'The binary goes to S3. Benches download it and check the SHA-256 before every flash.', `<div class="drop">${ic('i-upload')}<b>Drop .bin or .hex</b><span>from apps/firmware/.builds/artifacts · stepwhere.ino.bin</span></div><div class="fgrid">${fd('Version', '1.3', { help: 'Must match APP_VERSION in the sketch' })}${fd('Channel', 'Production', { sel: 1 })}${fd('Hardware', 'rev C', { sel: 1 })}${fd('Commit', 'e4f1a2c', { mono: 1 })}</div><div><label class="field-label">Release notes</label><div class="field area"><span>Wi-Fi fallback quiet scans, adaptive HTTP body size…</span></div></div><div class="codeline"><span>sha256 b71e 9a02 … 0c3d · 94.0 KB</span>${pill('Computed', 'ok')}</div>`, btn('Upload as draft', { v: 'primary', icon: 'i-upload' }));
+    case 'pair': return wrap('Pair a station', 'Run this on the bench PC. The code expires in 10 minutes.', `${fd('Station name', 'Bench 3')}<div><label class="field-label">1 · Install the agent</label><div class="codeline"><span>Windows · macOS · Linux · Raspberry Pi</span>${btn('Download', { sm: 1, icon: 'i-download' })}</div></div><div><label class="field-label">2 · Pair</label><div class="codeline"><span>qa-agent pair --code 7KQ-29X</span>${btn('', { v: 'ghost', sm: 1, icon: 'i-copy' })}</div><p class="field-help">Needs STM32CubeProgrammer installed. The agent finds it on its own.</p></div><div class="row" style="gap:8px;font-size:var(--t-12);color:var(--ink-2)"><span class="spinner"></span>Waiting for the agent to connect…</div>`, btn('Done', { v: 'primary' }));
+    case 'register': return wrap('Register units', 'Create records for a new batch of boards before they reach the bench.', `<div class="fgrid">${fd('Batch', 'B-2610-B')}${fd('PCB revision', 'rev C', { sel: 1 })}${fd('Quantity', '50', { suffix: 'boards' })}${fd('Supplier', 'JLC · PO 2231')}</div>${fd('Serials', 'SW-2213 → SW-2262', { mono: 1, help: 'Assigned in order. Print QR labels right after.' })}${oq('Or skip this: let each board register itself the first time a bench sees its chip UID.')}`, btn('Create 50 units', { v: 'primary', icon: 'i-plus' }));
+    case 'rework': return wrap('Send SW-2188-7B09 to rework', 'The unit leaves the line until rework is done, then goes back to Functional tests.', `${fd('Reason', 'GPS · no fix', { sel: 1 })}<div><label class="field-label">Note</label><div class="field area"><span style="color:var(--ink)">GPS antenna connector looked loose. Reseat it and check the U.FL.</span></div></div>${fd('Return to', 'Functional tests · retest the whole suite', { sel: 1 })}<label class="check"><span class="box"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>Scrap instead of rework</label>`, btn('Send to rework', { v: 'primary', icon: 'i-wrench' }));
+    case 'ship': return wrap('Create shipment', '2 units · pair PR-0412 · UK 7', `<div class="fgrid">${fd('Order', 'ORD-1047', { mono: 1 })}${fd('Customer', 'Mehta · Pune')}${fd('Courier', 'Delhivery', { sel: 1 })}${fd('Tracking', '1593 2210 5582', { mono: 1 })}</div><div class="lst"><div class="li"><span class="mono ink">SW-2168-L9YT</span><span class="r mono">SHOE-UK7-L-0412</span></div><div class="li"><span class="mono ink">SW-2169-L9YU</span><span class="r mono">SHOE-UK7-R-0412</span></div></div>`, btn('Mark as shipped', { v: 'primary', icon: 'i-truck' }));
+  }
+  return '';
+}
+
+/* ---------------- render ---------------- */
+const V = { flow: vFlow, overview: vOverview, units: vUnits, unit: vUnit, bench: vBench, runs: vRuns, suites: vSuites, firmware: vFirmware, stations: vStations, shipping: vShipping };
+const root = document.getElementById('root');
+function render(keep) {
+  const old = root.querySelector('.page');
+  const top = keep && old ? old.scrollTop : 0;
+  const nav = ['flow', 'overview', 'units', 'unit', 'bench', 'runs', 'suites', 'firmware', 'stations', 'shipping'];
+  root.innerHTML = `<div class="mock-nav"><svg class="wm" viewBox="0 0 670.24 84"><use href="#wordmark"/></svg><span class="t">QA mockup · screens</span>${nav.map((k) => `<button type="button" aria-pressed="${S.screen === k}" data-go="${k}">${k === 'unit' ? 'Unit detail' : TITLES[k]}</button>`).join('')}</div>
+  <div class="screen app">${sidebar()}<div class="screen-main">${topbar()}<div class="page">${V[S.screen]()}</div>${S.sheet ? sheetRun() : ''}${S.modal ? modal() : ''}</div></div>`;
+  const p = root.querySelector('.page');
+  if (p) p.scrollTop = top;
+  const c = root.querySelector('.console');
+  if (c) c.scrollTop = c.scrollHeight;
+  startSim();
+}
+function go(k, arg) {
+  stopSim(); S.screen = k; S.modal = S.sheet = null;
+  if (k === 'bench') { S.layout = 'single'; setBench(arg || 'idle'); }
+  if (k === 'unit' && arg) { S.unit = arg; S.unitTab = 'timeline'; }
+  if (k === 'units' && arg) S.unitsTab = arg;
+  if (k === 'shipping' && arg) S.shipTab = arg;
+  render();
+}
+function handle(t, e) {
+  const { go: g, act, arg } = t.dataset;
+  if (g) return go(g, arg);
+  const r = () => render(true);
+  switch (act) {
+    case 'bench': setBench(arg); r(); break;
+    case 'layout': stopSim(); S.layout = arg; r(); break;
+    case 'tab-unit': S.unitTab = arg; r(); break;
+    case 'tab-units': S.unitsTab = arg; r(); break;
+    case 'tab-ship': S.shipTab = arg; r(); break;
+    case 'tab-runs': S.runsTab = arg; r(); break;
+    case 'suite': S.suite = arg; r(); break;
+    case 'fw': S.fw = arg; r(); break;
+    case 'modal': S.modal = arg; S.sheet = null; r(); break;
+    case 'sheet': S.sheet = arg; r(); break;
+    case 'close': S.modal = S.sheet = null; r(); break;
+    case 'usel': S.usel.has(arg) ? S.usel.delete(arg) : S.usel.add(arg); r(); break;
+    case 'ssel': S.ssel.has(arg) ? S.ssel.delete(arg) : S.ssel.add(arg); r(); break;
+    case 'uclear': S.usel.clear(); r(); break;
+    case 'sclear': S.ssel.clear(); r(); break;
+  }
+}
+root.addEventListener('click', (e) => {
+  if (e.target.matches('[data-close]')) { S.modal = S.sheet = null; return render(true); }
+  if (e.target.closest('.switch')) { const sw = e.target.closest('.switch'); sw.setAttribute('aria-checked', String(sw.getAttribute('aria-checked') !== 'true')); return; }
+  if (e.target.closest('.seg button:not([data-act])')) { const b = e.target.closest('button'); b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); return; }
+  const t = e.target.closest('[data-go],[data-act]');
+  if (t) handle(t, e);
+});
+new ResizeObserver(() => {
+  const app = root.querySelector('.app');
+  if (!app) return;
+  const want = app.clientWidth < 1000;
+  if (want !== !!S.collapsed) { S.collapsed = want; render(true); }
+}).observe(root);
+(function initFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const s = p.get('s');
+  if (!s) return;
+  S.screen = s;
+  if (p.get('u')) S.unit = p.get('u');
+  if (p.get('t')) S.unitTab = p.get('t');
+  if (p.get('ship')) S.shipTab = p.get('ship');
+  if (p.get('fw')) S.fw = p.get('fw');
+  if (p.get('suite')) S.suite = p.get('suite');
+  if (p.get('m')) S.modal = p.get('m');
+  if (p.get('sheet')) S.sheet = p.get('sheet');
+  if (p.get('lay')) S.layout = p.get('lay');
+  if (p.get('sel')) S.usel.add(p.get('sel'));
+  if (s === 'bench') setBench(p.get('b') || 'idle');
+})();
+render();
+(function freezeForScreenshots() {
+  const p = new URLSearchParams(location.search);
+  if (!p.get('freeze')) return;
+  stopSim();
+  if (S.bench === 'testing') Object.assign(S.sim, { t: 9.4, gps: 151, steps: 14, pk: 18, wifi: 4, log: ['<span class="ag">[server]</span> watching IMEI 867946053102187 · suite Functional v4', '<span class="ok">[server] first packet accepted · 201 · uptimeMs 9412 · firmwareVersion 1.2</span>', '[TEL] seq=17 http=201 result=accepted sats=4 steps=12', '[TEL] seq=18 http=201 result=accepted sats=4 steps=14'] });
+  if (S.bench === 'flashing') { S.sim.p = 64; S.sim.log = FL.filter((x) => x[0] <= 64).map((x) => x[1]); }
+  upd();
+})();
+
+</script>
+</body>
+</html>

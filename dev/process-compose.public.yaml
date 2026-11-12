@@ -1,0 +1,87 @@
+# Public overlay: `pnpm dev:public`. Hosts the stack from this machine through
+# Pinggy Pro so anyone with the link can use it. Guide: docs/dev-stack.md.
+#
+#   https://<panel host>   admin, plus /v1 and /api/auth → server (one origin, so the session cookie is first-party)
+#   http://<panel host>    the firmware's existing /v1/telemetry/location
+#   https://<share host>   live share view
+#
+# Both tunnels end at the Caddy edge (dev/Caddyfile, Docker, 127.0.0.1:8800).
+environment:
+  - STEPWHERE_PUBLIC=1
+
+processes:
+  agent-pack:
+    description: Build the QA agent tarball served at /downloads
+    working_dir: apps/qa-agent
+    command: sh -c 'pnpm run pack:release && cp "$(ls -t release/stepwhere-qa-agent-*.tgz | head -1)" release/stepwhere-qa-agent.tgz'
+    log_location: .dev/logs/agent-pack.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    availability:
+      restart: "no"
+
+  edge:
+    description: Caddy edge for the tunnels (Docker)
+    command: node scripts/dev/run.mjs edge -- docker compose --profile public up --force-recreate caddy
+    log_location: .dev/logs/edge.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 8800, path: /__edge/health, scheme: http }
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 60
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+      max_restarts: 5
+    shutdown:
+      signal: 15
+      timeout_seconds: 15
+      parent_only: false
+
+  tunnel-panel:
+    description: Pinggy → edge for admin, API and firmware
+    command: node scripts/dev/tunnel.mjs panel
+    log_location: .dev/logs/tunnel-panel.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    depends_on:
+      edge:
+        condition: process_healthy
+    availability: &tunnel
+      restart: on_failure
+      backoff_seconds: 5
+      max_restarts: 1000
+    shutdown: &tunnel-shutdown
+      signal: 15
+      timeout_seconds: 5
+      parent_only: false
+
+  tunnel-share:
+    description: Pinggy → edge for the live share view
+    command: node scripts/dev/tunnel.mjs share
+    log_location: .dev/logs/tunnel-share.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    depends_on:
+      edge:
+        condition: process_healthy
+    availability: *tunnel
+    shutdown: *tunnel-shutdown

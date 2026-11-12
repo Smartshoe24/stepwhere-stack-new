@@ -1,0 +1,26 @@
+# Device simulator overlay: `pnpm dev:simulator`. Posts fake telemetry through
+# the local ingest proxy and API.
+processes:
+  simulator:
+    working_dir: apps/device-simulator
+    command: node ../../scripts/dev/run.mjs simulator -- pnpm exec vite --host 127.0.0.1 --port 5174 --strictPort
+    log_location: .dev/logs/simulator.log
+    log_configuration:
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 5174, path: /, scheme: http }
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 60
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+      max_restarts: 5
+    shutdown:
+      signal: 15
+      timeout_seconds: 10
+      parent_only: false

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Managed by Ansible. Nightly archive of {{ backups_config_paths | join(', ') }} to s3://{{ backups_bucket }}/daily/config/.
+set -euo pipefail
+# shellcheck source=/dev/null
+. {{ backups_lib_dir }}/backup-common.sh
+
+start_job "${HC_CONFIG_URL:-}"
+archive="$workdir/${today_utc}.tar.gz"
+
+# The services keep running, so tar can see a file change mid-read (exit 1). That is
+# tolerated; any other failure is not. SQLite files are copied with their WAL.
+rc=0
+tar -C /srv -czf "$archive" \
+{% for path in backups_config_excludes %}
+  --exclude={{ path | quote }} \
+{% endfor %}
+  {{ backups_config_paths | map('quote') | join(' ') }} || rc=$?
+[ "$rc" -le 1 ]
+[ -s "$archive" ]
+
+s3_put "$archive" "daily/config/${today_utc}.tar.gz"
+if [ "$day_of_month_utc" = "01" ]; then
+  s3_put "$archive" "monthly/config/${month_utc}.tar.gz"
+fi

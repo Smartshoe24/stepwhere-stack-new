@@ -1,0 +1,599 @@
+# Build And Release: builds linux/arm64 images on native Arm runners, pushes
+# them to ECR and deploys to the prod EC2 host through SSM Run Command.
+#
+# GitHub settings a human must configure:
+#   - Repository variable AWS_DEPLOY_ROLE_ARN: ARN of the IAM role
+#     `stepwhere-prod-github-deploy` (OpenTofu output of infra/prod). Its trust
+#     policy must allow ref:refs/heads/main and the `production` and
+#     `production-migrations` environments.
+#   - Repository variable AWS_DEPLOY_ENABLED: the release gate. Until it is
+#     `true`, pushes to main only build and push images; the migrate and deploy
+#     jobs are skipped. (Required reviewers on environments are not available
+#     for private repos on GitHub Free.)
+#   - Environments `production` (deploy job) and `production-migrations`
+#     (migrate job) are created automatically on first use.
+#   - Keep INFISICAL_ENV_SLUG and the INFISICAL_ADMIN_* / INFISICAL_SHARE_*
+#     variables (admin and share view build args).
+#   - Safe to delete once this workflow is merged (nothing reads them any more):
+#       secrets   DIGITALOCEAN_ACCESS_TOKEN, VPS_HOST, VPS_USER,
+#                 VPS_SSH_PRIVATE_KEY, VPS_SSH_PASSPHRASE, VPS_SSH_PORT
+#       variables SERVER_IMAGE_REPOSITORY, ADMIN_IMAGE_REPOSITORY,
+#                 SHARE_VIEW_IMAGE_REPOSITORY, DEVICE_INGEST_PROXY_IMAGE_REPOSITORY,
+#                 INFISICAL_SERVER_GITHUB_IDENTITY_ID, INFISICAL_SERVER_PROJECT_SLUG
+#
+# Compose files, Traefik/Pangolin config and the host .env are owned by
+# Ansible. This workflow only pulls images, runs migrations and restarts the
+# app services. Infra validation is in infra-checks.yml.
+
+name: Build And Release
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Force build and deploy server"
+        type: boolean
+        default: false
+      admin:
+        description: "Force build and deploy admin"
+        type: boolean
+        default: false
+      share_view:
+        description: "Force build and deploy share view"
+        type: boolean
+        default: false
+      device_ingest_proxy:
+        description: "Force build and deploy device ingest proxy"
+        type: boolean
+        default: false
+      deploy:
+        description: "Force deploy all app services without rebuilding images"
+        type: boolean
+        default: false
+      run_migrations:
+        description: "Run production migrations before deploy"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  # Used only if amazon-ecr-login does not report a registry.
+  ECR_REGISTRY_FALLBACK: 045837342042.dkr.ecr.ap-south-1.amazonaws.com
+  # Remote app directory on the host (Compose project `stepwhere`).
+  APP_DIR: /srv/stepwhere
+
+concurrency:
+  group: build-and-release-production
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      admin: ${{ steps.combine.outputs.admin }}
+      deploy: ${{ steps.combine.outputs.deploy }}
+      device_ingest_proxy: ${{ steps.combine.outputs.device_ingest_proxy }}
+      force_deploy: ${{ steps.combine.outputs.force_deploy }}
+      run_migrations: ${{ steps.combine.outputs.run_migrations }}
+      server: ${{ steps.combine.outputs.server }}
+      share_view: ${{ steps.combine.outputs.share_view }}
+      sha_image_tag: ${{ steps.meta.outputs.sha_image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute image tags
+        id: meta
+        run: echo "sha_image_tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect changed paths
+        if: github.event_name == 'push'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.event.before }}
+          ref: ${{ github.sha }}
+          filters: |
+            server:
+              - '.dockerignore'
+              - 'apps/server/**'
+              - 'package.json'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            admin:
+              - '.dockerignore'
+              - 'apps/admin/**'
+              - 'package.json'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            device_ingest_proxy:
+              - '.dockerignore'
+              - 'apps/device-ingest-proxy/**'
+              - 'package.json'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            share_view:
+              - '.dockerignore'
+              - 'apps/share-view/**'
+              - 'package.json'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            migrations:
+              - 'apps/server/drizzle/**/*.sql'
+              - 'apps/server/drizzle/meta/**'
+
+      - name: Combine trigger inputs
+        id: combine
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ADMIN: ${{ github.event.inputs.admin || 'false' }}
+          INPUT_DEPLOY: ${{ github.event.inputs.deploy || 'false' }}
+          INPUT_DEVICE_INGEST_PROXY: ${{ github.event.inputs.device_ingest_proxy || 'false' }}
+          INPUT_RUN_MIGRATIONS: ${{ github.event.inputs.run_migrations || 'false' }}
+          INPUT_SERVER: ${{ github.event.inputs.server || 'false' }}
+          INPUT_SHARE_VIEW: ${{ github.event.inputs.share_view || 'false' }}
+          FILTER_ADMIN: ${{ steps.filter.outputs.admin || 'false' }}
+          FILTER_DEVICE_INGEST_PROXY: ${{ steps.filter.outputs.device_ingest_proxy || 'false' }}
+          FILTER_MIGRATIONS: ${{ steps.filter.outputs.migrations || 'false' }}
+          FILTER_SERVER: ${{ steps.filter.outputs.server || 'false' }}
+          FILTER_SHARE_VIEW: ${{ steps.filter.outputs.share_view || 'false' }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            admin="$INPUT_ADMIN"
+            device_ingest_proxy="$INPUT_DEVICE_INGEST_PROXY"
+            force_deploy="$INPUT_DEPLOY"
+            run_migrations="$INPUT_RUN_MIGRATIONS"
+            server="$INPUT_SERVER"
+            share_view="$INPUT_SHARE_VIEW"
+          else
+            admin="$FILTER_ADMIN"
+            device_ingest_proxy="$FILTER_DEVICE_INGEST_PROXY"
+            force_deploy="false"
+            run_migrations="$FILTER_MIGRATIONS"
+            server="$FILTER_SERVER"
+            share_view="$FILTER_SHARE_VIEW"
+          fi
+
+          if [ "$run_migrations" = "true" ]; then
+            server="true"
+          fi
+
+          deploy="false"
+          for value in "$admin" "$device_ingest_proxy" "$force_deploy" "$server" "$share_view"; do
+            if [ "$value" = "true" ]; then
+              deploy="true"
+              break
+            fi
+          done
+
+          echo "admin=$admin" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "device_ingest_proxy=$device_ingest_proxy" >> "$GITHUB_OUTPUT"
+          echo "force_deploy=$force_deploy" >> "$GITHUB_OUTPUT"
+          echo "run_migrations=$run_migrations" >> "$GITHUB_OUTPUT"
+          echo "server=$server" >> "$GITHUB_OUTPUT"
+          echo "share_view=$share_view" >> "$GITHUB_OUTPUT"
+
+  server:
+    needs: setup
+    if: needs.setup.outputs.server == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck server
+        run: pnpm --filter @stepwhere/server typecheck
+
+      - name: Run server tests
+        run: pnpm --filter @stepwhere/server test
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-server:${{ needs.setup.outputs.sha_image_tag }}
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-server:main
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=max
+
+  admin:
+    needs: setup
+    if: needs.setup.outputs.admin == 'true'
+    runs-on: ubuntu-24.04-arm
+    # id-token is needed by both the Infisical OIDC login and AWS.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch admin build variables from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: "oidc"
+          identity-id: ${{ vars.INFISICAL_ADMIN_GITHUB_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_ADMIN_PROJECT_SLUG }}
+          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
+
+      - name: Lint admin
+        run: pnpm --filter shadcn-admin lint
+
+      - name: Build admin
+        run: pnpm --filter shadcn-admin build
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/admin/Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          push: true
+          build-args: |
+            VITE_STEPWHERE_API_URL=${{ env.VITE_STEPWHERE_API_URL }}
+            VITE_STEPWHERE_AUTH_URL=${{ env.VITE_STEPWHERE_AUTH_URL }}
+            VITE_GOOGLE_MAPS_API_KEY=${{ env.VITE_GOOGLE_MAPS_API_KEY }}
+          tags: |
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-admin:${{ needs.setup.outputs.sha_image_tag }}
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-admin:main
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,scope=admin,mode=max
+
+  share_view:
+    needs: setup
+    if: needs.setup.outputs.share_view == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch share view build variables from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: "oidc"
+          identity-id: ${{ vars.INFISICAL_SHARE_GITHUB_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_SHARE_PROJECT_SLUG }}
+          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
+
+      # The image build refuses to ship without the iOS/Android association
+      # files, because /family/join universal links silently stop opening the
+      # app. Fail here with the missing key instead of a bare `test -s` in Docker.
+      - name: Check app association variables
+        run: |
+          missing=""
+          [ -n "${APPLE_TEAM_ID// /}" ] || missing="$missing APPLE_TEAM_ID"
+          [ -n "${ANDROID_CERT_SHA256_FINGERPRINTS// /}" ] || missing="$missing ANDROID_CERT_SHA256_FINGERPRINTS"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing share view build variables in Infisical (project ${{ vars.INFISICAL_SHARE_PROJECT_SLUG }}, env ${{ vars.INFISICAL_ENV_SLUG }}):$missing"
+            exit 1
+          fi
+
+      - name: Build share view
+        run: pnpm --filter @stepwhere/share-view build
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push share view image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/share-view/Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          push: true
+          build-args: |
+            VITE_GOOGLE_MAPS_API_KEY=${{ env.VITE_GOOGLE_MAPS_API_KEY }}
+            VITE_APP_STORE_URL=${{ env.VITE_APP_STORE_URL }}
+            VITE_PLAY_STORE_URL=${{ env.VITE_PLAY_STORE_URL }}
+            APPLE_TEAM_ID=${{ env.APPLE_TEAM_ID }}
+            ANDROID_CERT_SHA256_FINGERPRINTS=${{ env.ANDROID_CERT_SHA256_FINGERPRINTS }}
+          tags: |
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-share-view:${{ needs.setup.outputs.sha_image_tag }}
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-share-view:main
+          cache-from: type=gha,scope=share-view
+          cache-to: type=gha,scope=share-view,mode=max
+
+  device_ingest_proxy:
+    needs: setup
+    if: needs.setup.outputs.device_ingest_proxy == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck device ingest proxy
+        run: pnpm --filter @stepwhere/device-ingest-proxy typecheck
+
+      - name: Run device ingest proxy tests
+        run: pnpm --filter @stepwhere/device-ingest-proxy test
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push device ingest proxy image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/device-ingest-proxy/Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-device-ingest-proxy:${{ needs.setup.outputs.sha_image_tag }}
+            ${{ steps.ecr.outputs.registry || env.ECR_REGISTRY_FALLBACK }}/stepwhere-device-ingest-proxy:main
+          cache-from: type=gha,scope=device-ingest-proxy
+          cache-to: type=gha,scope=device-ingest-proxy,mode=max
+
+  # RDS is private, so migrations run on the host (through SSM) inside the
+  # freshly pulled server image, before the server container is restarted.
+  migrate:
+    needs: [setup, server]
+    # AWS_DEPLOY_ENABLED is the release gate: required reviewers on
+    # environments are not available for private repos on GitHub Free.
+    if: vars.AWS_DEPLOY_ENABLED == 'true' && needs.setup.outputs.run_migrations == 'true'
+    runs-on: ubuntu-latest
+    environment: production-migrations
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run production migrations on the host
+        run: |
+          read -r -d '' remote <<'REMOTE' || true
+          docker compose pull server
+          docker compose run --rm server sh -c 'infisical run --env="$INFISICAL_ENV" --projectId="$INFISICAL_PROJECT_ID" --path="${INFISICAL_PATH:-/}" -- node dist/scripts/migrate.js'
+          REMOTE
+          bash infra/scripts/ssm-run.sh "cd $APP_DIR"$'\n'"$remote"
+
+  deploy:
+    needs: [setup, server, admin, share_view, device_ingest_proxy, migrate]
+    if: |
+      always() &&
+      vars.AWS_DEPLOY_ENABLED == 'true' &&
+      needs.setup.outputs.deploy == 'true' &&
+      needs.server.result != 'failure' &&
+      needs.server.result != 'cancelled' &&
+      needs.admin.result != 'failure' &&
+      needs.admin.result != 'cancelled' &&
+      needs.share_view.result != 'failure' &&
+      needs.share_view.result != 'cancelled' &&
+      needs.device_ingest_proxy.result != 'failure' &&
+      needs.device_ingest_proxy.result != 'cancelled' &&
+      needs.migrate.result != 'failure' &&
+      needs.migrate.result != 'cancelled'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Compose, Traefik and .env are managed by Ansible, so the images are
+      # pulled by their `main` tag from the compose file already on the host.
+      - name: Deploy changed services
+        env:
+          ADMIN_CHANGED: ${{ needs.setup.outputs.admin }}
+          DEVICE_INGEST_PROXY_CHANGED: ${{ needs.setup.outputs.device_ingest_proxy }}
+          FORCE_DEPLOY: ${{ needs.setup.outputs.force_deploy }}
+          SERVER_CHANGED: ${{ needs.setup.outputs.server }}
+          SHARE_VIEW_CHANGED: ${{ needs.setup.outputs.share_view }}
+          SSM_RUN_TIMEOUT: "1200"
+        run: |
+          services=""
+          add_service() {
+            case " $services " in
+              *" $1 "*) ;;
+              *) services="$services $1" ;;
+            esac
+          }
+
+          if [ "$FORCE_DEPLOY" = "true" ]; then
+            SERVER_CHANGED=true
+            ADMIN_CHANGED=true
+            SHARE_VIEW_CHANGED=true
+            DEVICE_INGEST_PROXY_CHANGED=true
+          fi
+          [ "$SERVER_CHANGED" = "true" ] && add_service server
+          [ "$ADMIN_CHANGED" = "true" ] && add_service admin
+          [ "$SHARE_VIEW_CHANGED" = "true" ] && add_service share-view
+          [ "$DEVICE_INGEST_PROXY_CHANGED" = "true" ] && add_service device-ingest-proxy
+          services="${services# }"
+          echo "Deploying: $services"
+
+          # Services are on Docker networks behind Traefik, with no host ports,
+          # so each one is probed from inside its own container (same probes as
+          # the compose healthchecks).
+          read -r -d '' remote <<'REMOTE' || true
+          docker compose pull $SERVICES
+          docker compose up -d $SERVICES
+          docker image prune -f >/dev/null 2>&1 || true
+
+          probe_cmd() {
+            case "$1" in
+              server) echo 'curl -fsS http://127.0.0.1:8223/health' ;;
+              admin) echo 'wget -qO- http://127.0.0.1/health' ;;
+              share-view) echo 'wget -qO- http://127.0.0.1/health' ;;
+              device-ingest-proxy) echo "node -e \"fetch('http://127.0.0.1:8290/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" ;;
+            esac
+          }
+
+          for svc in $SERVICES; do
+            cmd="$(probe_cmd "$svc")"
+            ok=false
+            for attempt in $(seq 1 30); do
+              if docker compose exec -T "$svc" sh -c "$cmd" >/dev/null 2>&1; then
+                ok=true
+                break
+              fi
+              sleep 3
+            done
+            if [ "$ok" != "true" ]; then
+              echo "$svc failed its health check" >&2
+              docker compose ps || true
+              docker compose logs --tail 100 "$svc" || true
+              exit 1
+            fi
+            echo "$svc is healthy"
+          done
+
+          docker compose ps
+          REMOTE
+          bash infra/scripts/ssm-run.sh "cd $APP_DIR"$'\n'"SERVICES='$services'"$'\n'"$remote"
+
+      - name: Verify public production health
+        run: |
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 https://api.stepwhere.in/health >/dev/null
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 https://share.stepwhere.in/health >/dev/null
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 https://share.stepwhere.in/.well-known/apple-app-site-association >/dev/null
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 https://share.stepwhere.in/.well-known/assetlinks.json >/dev/null

@@ -1,0 +1,265 @@
+/*
+ * Night Trail: Stepwhere Admin design tokens (dark).
+ * Source of truth: apps/admin/design/design-system.html
+ *
+ * shadcn's variable names (--background, --primary, …) are kept and pointed at
+ * Night Trail values so every primitive inherits the theme. Night Trail's own
+ * roles (--act, --toggle, --here, status, trail) are added alongside and
+ * exposed to Tailwind through @theme below. Token names are role-based so a
+ * light theme can be added later by redefining this block under `.light`.
+ */
+:root,
+.dark {
+  color-scheme: dark;
+
+  /* Night: surfaces. One neutral hue, lightness steps only. */
+  --night-inset: #050507;
+  --night-canvas: #07070a;
+  --night-raised: #0e0e12;
+  --night-overlay: #15151a;
+  --night-hover: #1c1c22;
+
+  /* Lines: low-opacity white so edges blend with any surface */
+  --line-faint: rgb(255 255 255 / 0.06);
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.16);
+
+  /* Ink: four text levels */
+  --ink: #f4f4f6;
+  --ink-2: #a6a6ae;
+  --ink-3: #80808a;
+  --ink-4: #48484f;
+
+  /* Brand */
+  --peach: #f5cf8d;
+  --pink: #ff66cb;
+  --trail: linear-gradient(90deg, var(--peach) 0%, var(--pink) 100%);
+  --trail-v: linear-gradient(180deg, var(--peach) 0%, var(--pink) 100%);
+
+  /* Peach speaks: anything with a word on it */
+  --act: #f4c87d;
+  --act-hover: #f9dda9;
+  --act-fill: rgb(244 200 125 / 0.24);
+  --act-fill-hover: rgb(244 200 125 / 0.32);
+  --act-fill-press: rgb(244 200 125 / 0.18);
+  --act-fill-line: rgb(244 200 125 / 0.46);
+  --on-act-fill: #ffffff;
+
+  /* Pink switches: wordless state */
+  --toggle: var(--pink);
+  --toggle-wash: rgb(255 102 203 / 0.28);
+  --on-toggle: #14070f;
+  --on-trail: #14070f;
+
+  /* Peach tint marks "you are here" */
+  --here: var(--peach);
+  --here-wash: rgb(245 207 141 / 0.07);
+
+  /* Status: same meanings as the mobile app */
+  --ok: #4ade80;
+  --ok-wash: rgb(74 222 128 / 0.12);
+  --caution: #ff9f43;
+  --caution-wash: rgb(255 159 67 / 0.12);
+  --breach: #f87171;
+  --breach-wash: rgb(248 113 113 / 0.12);
+  --info: #60a5fa;
+  --info-wash: rgb(96 165 250 / 0.12);
+  --unset: #a78bfa;
+  --unset-wash: rgb(167 139 250 / 0.12);
+
+  /* Hairlines: 0.5px on retina, 1px elsewhere */
+  --hair: 1px;
+  --edge: 1px;
+
+  /* Focus: trail hairline + soft halo */
+  --focus-opacity: 0.8;
+  --focus-glow:
+    0 0 14px -2px rgb(255 102 203 / 0.24), 0 0 6px -1px rgb(245 207 141 / 0.2);
+
+  /* Depth: only overlays get a shadow */
+  --shadow-overlay:
+    0 0 0 1px var(--line), 0 16px 40px -12px rgb(0 0 0 / 0.85),
+    0 4px 12px -4px rgb(0 0 0 / 0.6);
+
+  /* Motion */
+  --ease-out-trail: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* ---------- shadcn mapping ---------- */
+  --radius: 0.5rem; /* 8px cards; controls 6, dialogs 12 via scale below */
+  --background: var(--night-canvas);
+  --foreground: var(--ink);
+  --card: var(--night-raised);
+  --card-foreground: var(--ink);
+  --popover: var(--night-overlay);
+  --popover-foreground: var(--ink);
+  --primary: var(--act);
+  --primary-foreground: var(--on-act-fill);
+  --secondary: var(--night-overlay);
+  --secondary-foreground: var(--ink);
+  --muted: var(--night-raised);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--night-hover);
+  --accent-foreground: var(--ink);
+  --destructive: var(--breach);
+  --destructive-foreground: var(--breach);
+  --border: var(--line-faint);
+  --input: var(--line);
+  --ring: var(--act);
+
+  --chart-1: var(--pink);
+  --chart-2: var(--peach);
+  --chart-3: var(--info);
+  --chart-4: var(--ok);
+  --chart-5: var(--unset);
+  --chart-axis: var(--ink-3);
+  --chart-grid: var(--line-faint);
+
+  --sidebar: var(--night-canvas);
+  --sidebar-foreground: var(--ink-2);
+  --sidebar-primary: var(--act);
+  --sidebar-primary-foreground: var(--on-act-fill);
+  --sidebar-accent: rgb(255 255 255 / 0.04);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line-faint);
+  --sidebar-ring: var(--act);
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hair: 0.5px;
+  }
+}
+
+/*
+ * QA pages: calmer status colours. The bench shows up to 30 boards at once and
+ * almost everything on it is a status, so the full-strength tones read as
+ * noise. Set on <html> while a QA page is open (routes/_authenticated/qa/route.tsx)
+ * so dialogs, sheets and hover cards in portals follow too.
+ */
+:root.qa-calm {
+  --ok: #86b896;
+  --ok-wash: rgb(134 184 150 / 0.1);
+  --caution: #d2a66a;
+  --caution-wash: rgb(210 166 106 / 0.1);
+  --breach: #d88a84;
+  --breach-wash: rgb(216 138 132 / 0.1);
+  --info: #8fa6c4;
+  --info-wash: rgb(143 166 196 / 0.1);
+  --act: #dcc5a0;
+  --act-hover: #e8d6b9;
+  --act-fill: rgb(220 197 160 / 0.2);
+  --act-fill-hover: rgb(220 197 160 / 0.28);
+  --act-fill-press: rgb(220 197 160 / 0.15);
+  --act-fill-line: rgb(220 197 160 / 0.4);
+}
+
+@theme inline {
+  --font-sans:
+    'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono:
+    'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Radius: 4 xs · 6 controls · 8 cards · 12 dialogs */
+  --radius-xs: 4px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
+
+  /* Type scale, 1.2 ratio from 13px */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 1.3;
+  --text-xs: 12px;
+  --text-xs--line-height: 1.45;
+  --text-sm: 13px;
+  --text-sm--line-height: 1.5;
+  --text-base: 14px;
+  --text-base--line-height: 1.5;
+  --text-lg: 16px;
+  --text-lg--line-height: 1.4;
+  --text-xl: 19px;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 23px;
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 1.1;
+
+  --shadow-overlay: var(--shadow-overlay);
+  --ease-trail: var(--ease-out-trail);
+
+  /* shadcn colours */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Night Trail colours */
+  --color-inset: var(--night-inset);
+  --color-canvas: var(--night-canvas);
+  --color-raised: var(--night-raised);
+  --color-overlay: var(--night-overlay);
+  --color-hover: var(--night-hover);
+  --color-line-faint: var(--line-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-peach: var(--peach);
+  --color-pink: var(--pink);
+  --color-act: var(--act);
+  --color-act-hover: var(--act-hover);
+  --color-act-fill: var(--act-fill);
+  --color-act-fill-hover: var(--act-fill-hover);
+  --color-act-fill-press: var(--act-fill-press);
+  --color-act-fill-line: var(--act-fill-line);
+  --color-on-act-fill: var(--on-act-fill);
+  --color-toggle: var(--toggle);
+  --color-toggle-wash: var(--toggle-wash);
+  --color-on-toggle: var(--on-toggle);
+  --color-on-trail: var(--on-trail);
+  --color-here: var(--here);
+  --color-here-wash: var(--here-wash);
+  --color-ok: var(--ok);
+  --color-ok-wash: var(--ok-wash);
+  --color-caution: var(--caution);
+  --color-caution-wash: var(--caution-wash);
+  --color-breach: var(--breach);
+  --color-breach-wash: var(--breach-wash);
+  --color-info: var(--info);
+  --color-info-wash: var(--info-wash);
+  --color-unset: var(--unset);
+  --color-unset-wash: var(--unset-wash);
+}

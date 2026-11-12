@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781796156228,
+      "tag": "0000_warm_swordsman",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781801002867,
+      "tag": "0001_strong_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784126656519,
+      "tag": "0002_typical_ultimo",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784410000000,
+      "tag": "0003_history_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784981919000,
+      "tag": "0004_history_stability",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785500000000,
+      "tag": "0005_gps_connectivity",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786000000000,
+      "tag": "0006_live_step_totals",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786473000000,
+      "tag": "0007_preview_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786723200000,
+      "tag": "0008_telemetry_reliability",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786809600000,
+      "tag": "0009_live_share_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787566382808,
+      "tag": "0010_account_deletion_review_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789574400000,
+      "tag": "0011_cell_geolocation",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790756554089,
+      "tag": "0012_family_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790757965577,
+      "tag": "0013_billing_price_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791638688320,
+      "tag": "0014_network_geolocation",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792410046209,
+      "tag": "0015_qa_bench",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792451750677,
+      "tag": "0016_qa_units",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792453048665,
+      "tag": "0017_qa_test_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792501861225,
+      "tag": "0018_qa_station_slots",
+      "breakpoints": true
+    }
+  ]
+}

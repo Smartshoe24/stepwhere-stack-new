@@ -1,0 +1,94 @@
+# Managed by Ansible. Dashboard routes from Pangolin's installer template.
+# Resource routes (api, share, ingest, panel, monitor, logs) come from Pangolin
+# itself through the HTTP provider; do not add them here.
+http:
+  middlewares:
+    badger:
+      plugin:
+        badger:
+          disableForwardAuth: true
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+
+  routers:
+    # HTTP to HTTPS redirect router
+    main-app-router-redirect:
+      rule: "Host(`{{ pangolin_dashboard_domain }}`)"
+      service: next-service
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+        - badger
+
+    # Next.js router (handles everything except API and WebSocket paths)
+    next-router:
+      rule: "Host(`{{ pangolin_dashboard_domain }}`) && !PathPrefix(`/api/v1`)"
+      service: next-service
+      entryPoints:
+        - websecure
+      middlewares:
+        - badger
+      tls:
+        certResolver: letsencrypt
+
+    # API router (handles /api/v1 paths)
+    api-router:
+      rule: "Host(`{{ pangolin_dashboard_domain }}`) && PathPrefix(`/api/v1`)"
+      service: api-service
+      entryPoints:
+        - websecure
+      middlewares:
+        - badger
+      tls:
+        certResolver: letsencrypt
+
+    # WebSocket router
+    ws-router:
+      rule: "Host(`{{ pangolin_dashboard_domain }}`)"
+      service: api-service
+      entryPoints:
+        - websecure
+      middlewares:
+        - badger
+      tls:
+        certResolver: letsencrypt
+
+    # FALLBACK, NOT ACTIVE. Firmware posts to http://{{ pangolin_ingest_domain }} over plain HTTP and must
+    # never be redirected. Normally this is a Pangolin HTTP resource with SSL off, which
+    # Pangolin routes on the `web` entrypoint with no redirect. Only if the Phase 0 spike
+    # (plan section 7, item 1) shows that Pangolin cannot do that, uncomment this router
+    # and the `ingest-service` below, and delete the ingest resource in Pangolin.
+    # No redirect-to-https and no badger middleware here: the endpoint is public.
+    #
+    # ingest-router:
+    #   rule: "Host(`{{ pangolin_ingest_domain }}`)"
+    #   service: ingest-service
+    #   entryPoints:
+    #     - web
+
+  services:
+    next-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3002"  # Next.js server
+
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3000"  # API/WebSocket server
+
+    # ingest-service:
+    #   loadBalancer:
+    #     servers:
+    #       - url: "http://device-ingest-proxy:8290"
+
+tcp:
+  serversTransports:
+    pp-transport-v1:
+      proxyProtocol:
+        version: 1
+    pp-transport-v2:
+      proxyProtocol:
+        version: 2

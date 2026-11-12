@@ -1,0 +1,36 @@
+{
+  "name": "@stepwhere/qa-agent",
+  "version": "0.2.0",
+  "description": "Stepwhere QA bench agent: flashes firmware through STM32CubeProgrammer and streams TTL serial output.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "stepwhere-qa-agent": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "pack:release": "pnpm build && pnpm pack --pack-destination release"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "@stepwhere/types": "workspace:*",
+    "@types/node": "^25.8.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.0",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4",
+    "ws": "^8.20.1"
+  }
+}

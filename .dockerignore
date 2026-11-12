@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+.git
+.turbo
+.DS_Store
+.env
+.env.*
+!**/.env.example
+dist
+coverage
+.artifacts
+apps/*/dist
+apps/*/.expo
+apps/mobile/android/.gradle
+apps/device-simulator
+apps/mobile
+apps/admin/src/**/__screenshots__

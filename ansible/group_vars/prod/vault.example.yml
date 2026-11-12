@@ -1,0 +1,26 @@
+---
+# Template for group_vars/prod/vault.yml (gitignored).
+#   cp vault.example.yml vault.yml && $EDITOR vault.yml && ansible-vault encrypt vault.yml
+# Use letters and digits only in passwords and tokens (openssl rand -hex 24): they are
+# written into .env and systemd environment files without escaping.
+
+# Infisical machine-identity/service token the server uses to read its secrets.
+vault_infisical_token: "replace-me"
+
+# Redis password. Must match the password in REDIS_URL stored in Infisical.
+vault_redis_password: "replace-me"
+
+# Pangolin server.secret: at least 32 random characters (openssl rand -hex 32).
+vault_pangolin_server_secret: "replace-me"
+
+# Beszel agent public key. Only known after the hub is up: hub UI -> Add system -> copy the
+# public key. Leave empty on the first run; the agent is not started while it is empty.
+vault_beszel_agent_key: ""
+
+# Passwords for the two database roles that db-roles.yml creates on RDS.
+vault_rds_app_password: "replace-me"
+vault_rds_backup_password: "replace-me"
+
+# Optional healthchecks.io ping URLs (dead-man's switch). Empty = no ping.
+vault_healthchecks_db_url: ""
+vault_healthchecks_config_url: ""

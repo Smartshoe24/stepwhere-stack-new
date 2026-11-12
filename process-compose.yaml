@@ -1,0 +1,123 @@
+# Local dev stack: `pnpm dev`. Guide: docs/dev-stack.md.
+#
+# Every app starts through scripts/dev/run.mjs, which layers Infisical secrets
+# (when available), local stand-ins for required secrets, and the URL/port
+# overlay from scripts/dev/env.mjs. Overlays in dev/ add the public edge and
+# tunnels, Metro and the device simulator.
+version: "0.5"
+
+environment:
+  - FORCE_COLOR=1
+
+processes:
+  urls:
+    description: Where everything lives
+    command: node scripts/dev/urls.mjs
+    availability:
+      restart: "no"
+
+  infra:
+    description: Postgres and Redis in Docker; left running on pnpm dev:down
+    command: node scripts/dev/run.mjs infra -- docker compose up -d --wait --wait-timeout 120 postgres redis
+    log_location: .dev/logs/infra.log
+    log_configuration: &plain-logs
+      disable_json: true
+      no_metadata: true
+      no_color: true
+      fields_order: ["message"]
+      flush_each_line: true
+    availability:
+      restart: "no"
+
+  migrate:
+    description: Apply Drizzle migrations to the local database
+    working_dir: apps/server
+    command: node ../../scripts/dev/run.mjs migrate -- pnpm run db:migrate:local
+    log_location: .dev/logs/migrate.log
+    log_configuration: *plain-logs
+    depends_on:
+      infra:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  types:
+    description: Build @stepwhere/types (the server imports its dist)
+    working_dir: packages/types
+    command: pnpm run build
+    log_location: .dev/logs/types.log
+    log_configuration: *plain-logs
+    availability:
+      restart: "no"
+
+  server:
+    working_dir: apps/server
+    command: node ../../scripts/dev/run.mjs server -- pnpm exec tsx watch src/index.ts
+    log_location: .dev/logs/server.log
+    log_configuration: *plain-logs
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
+      types:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 8223, path: /ready, scheme: http }
+      initial_delay_seconds: 2
+      period_seconds: 2
+      timeout_seconds: 5
+      failure_threshold: 120
+    availability: &restart
+      restart: on_failure
+      backoff_seconds: 3
+      max_restarts: 5
+    shutdown: &shutdown
+      signal: 15
+      timeout_seconds: 10
+      parent_only: false
+
+  ingest:
+    description: Device ingest proxy (/location → server), same as prod
+    working_dir: apps/device-ingest-proxy
+    command: node ../../scripts/dev/run.mjs ingest -- pnpm exec tsx watch src/index.ts
+    log_location: .dev/logs/ingest.log
+    log_configuration: *plain-logs
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 8290, path: /health, scheme: http }
+      initial_delay_seconds: 1
+      period_seconds: 2
+      failure_threshold: 60
+    availability: *restart
+    shutdown: *shutdown
+
+  admin:
+    working_dir: apps/admin
+    command: node ../../scripts/dev/run.mjs admin -- pnpm exec vite --host 127.0.0.1 --port 4800 --strictPort
+    log_location: .dev/logs/admin.log
+    log_configuration: *plain-logs
+    depends_on:
+      types:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 4800, path: /, scheme: http }
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 60
+    availability: *restart
+    shutdown: *shutdown
+
+  share:
+    description: Live share view
+    working_dir: apps/share-view
+    command: node ../../scripts/dev/run.mjs share -- pnpm exec vite --host 127.0.0.1 --port 5175 --strictPort
+    log_location: .dev/logs/share.log
+    log_configuration: *plain-logs
+    depends_on:
+      types:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get: { host: 127.0.0.1, port: 5175, path: /, scheme: http }
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 60
+    availability: *restart
+    shutdown: *shutdown

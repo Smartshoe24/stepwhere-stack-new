@@ -1,0 +1,127 @@
+---
+# One-off: create the application and backup roles on RDS. Run from a laptop while
+# `make db-tunnel` forwards 127.0.0.1:15432 to the RDS endpoint:
+#   ansible-playbook -i localhost, db-roles.yml
+# Prompts for the master (stepwhere_admin) password from Secrets Manager. Needs
+# psycopg2 for the Python that runs ansible-playbook.
+- name: Create database roles on RDS
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/prod/main.yml
+    - group_vars/prod/vault.yml
+  vars_prompt:
+    - name: db_admin_password
+      prompt: Password of the RDS master user (Secrets Manager)
+      private: true
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    db_host: 127.0.0.1
+    db_port: 15432
+    db_admin_user: stepwhere_admin
+    db_app_role: stepwhere_app
+    db_backup_role: "{{ rds_backup_user }}"
+    # Set true to push the vault passwords to roles that already exist (rotation).
+    db_roles_update_passwords: false
+    db_ca_url: https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+    db_login: &db_login
+      login_host: "{{ db_host }}"
+      login_port: "{{ db_port }}"
+      login_user: "{{ db_admin_user }}"
+      login_password: "{{ db_admin_password }}"
+      login_db: "{{ rds_database }}"
+      # The tunnel's host name (127.0.0.1) is not in the RDS certificate, so check the
+      # chain but not the name.
+      ssl_mode: verify-ca
+      ca_cert: "{{ db_ca_file.path | default(omit) }}"
+  tasks:
+    - name: Check the vault passwords
+      ansible.builtin.assert:
+        that:
+          - vault_rds_app_password | length > 0
+          - vault_rds_backup_password | length > 0
+        quiet: true
+
+    - name: Check that the tunnel is up
+      ansible.builtin.wait_for:
+        host: "{{ db_host }}"
+        port: "{{ db_port }}"
+        timeout: 5
+        msg: Nothing is listening on {{ db_host }}:{{ db_port }}. Run `make db-tunnel` in another terminal.
+
+    - name: Roles and ownership
+      block:
+        - name: Create a file for the RDS CA bundle
+          ansible.builtin.tempfile:
+            state: file
+            suffix: rds-ca.pem
+          register: db_ca_file
+
+        - name: Download the RDS CA bundle
+          ansible.builtin.get_url:
+            url: "{{ db_ca_url }}"
+            dest: "{{ db_ca_file.path }}"
+            mode: "0600"
+            force: true
+
+        - name: Create the application role
+          community.postgresql.postgresql_user:
+            <<: *db_login
+            name: "{{ db_app_role }}"
+            password: "{{ vault_rds_app_password }}"
+            encrypted: true
+            role_attr_flags: LOGIN
+            no_password_changes: "{{ not (db_roles_update_passwords | bool) }}"
+          no_log: true
+
+        - name: Create the backup role
+          community.postgresql.postgresql_user:
+            <<: *db_login
+            name: "{{ db_backup_role }}"
+            password: "{{ vault_rds_backup_password }}"
+            encrypted: true
+            role_attr_flags: LOGIN
+            no_password_changes: "{{ not (db_roles_update_passwords | bool) }}"
+          no_log: true
+
+        - name: Let the backup role read every table
+          community.postgresql.postgresql_membership:
+            <<: *db_login
+            groups:
+              - pg_read_all_data
+            target_roles:
+              - "{{ db_backup_role }}"
+            state: present
+
+        # PostgreSQL 16+: handing over ownership needs SET ROLE on the new owner, which the
+        # automatic grant to the creator does not include. Re-granting is harmless.
+        - name: Let the master user hand objects to the application role
+          community.postgresql.postgresql_query:
+            <<: *db_login
+            query: "GRANT {{ db_app_role }} TO CURRENT_USER WITH SET TRUE"
+          changed_when: false
+
+        - name: Make the application role own schema public
+          community.postgresql.postgresql_owner:
+            <<: *db_login
+            db: "{{ rds_database }}"
+            new_owner: "{{ db_app_role }}"
+            obj_type: schema
+            obj_name: public
+
+        # drizzle-kit keeps its bookkeeping in its own schema, which needs CREATE on the database.
+        - name: Let the application role create schemas
+          community.postgresql.postgresql_privs:
+            <<: *db_login
+            db: "{{ rds_database }}"
+            type: database
+            privs: CREATE
+            roles: "{{ db_app_role }}"
+            state: present
+      always:
+        - name: Remove the CA bundle
+          ansible.builtin.file:
+            path: "{{ db_ca_file.path }}"
+            state: absent
+          when: db_ca_file.path is defined

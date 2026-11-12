@@ -1,0 +1,5 @@
+.vitest-attachments
+
+# Vitest browser failure screenshots
+__screenshots__/
+.tanstack

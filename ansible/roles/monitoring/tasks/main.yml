@@ -1,0 +1,17 @@
+---
+# The services themselves are in the Compose project (roles/stack/templates/compose.yml.j2).
+# This role prepares their host directories. Beszel's own S3 backup stays off: the instance
+# role can only PutObject, so the backups role tars these directories instead.
+- name: Create the Beszel directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ monitoring_beszel_dir }}/data"
+    - "{{ monitoring_beszel_dir }}/agent"
+    - "{{ monitoring_beszel_dir }}/socket"
+    # Marker folder: the agent reports disk usage of the data volume from here.
+    - "{{ monitoring_data_mount }}/.beszel"

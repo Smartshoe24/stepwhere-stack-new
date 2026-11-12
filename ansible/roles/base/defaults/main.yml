@@ -1,0 +1,35 @@
+---
+base_timezone: Etc/UTC
+base_journald_max_use: 500M
+base_swap_file: /swapfile
+base_swap_size: 2G
+base_swappiness: 10
+
+base_packages:
+  - ca-certificates
+  - chrony
+  - curl
+  - e2fsprogs
+  - gnupg
+  - jq
+  - python3-debian # deb822_repository
+  - python3-requests # community.docker modules
+  - unattended-upgrades
+
+base_deploy_user: deploy
+# Public keys that may log in as deploy (CI uses SSM Run Command as root, so this can stay empty).
+base_deploy_authorized_keys: []
+
+# Data volume: the DataVolumeId instance tag names the EBS volume (see plan section 15).
+base_data_volume_id: "{{ tags.DataVolumeId | default('') }}"
+base_data_device: "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_{{ base_data_volume_id | replace('-', '') }}"
+base_data_label: stepwhere-data
+base_data_mount: /srv
+
+# owner, group, mode of each directory under the data mount
+base_data_dirs:
+  - { path: /srv/stepwhere, owner: root, group: root, mode: "0755" }
+  - { path: /srv/pangolin, owner: root, group: root, mode: "0755" }
+  # redis:alpine runs as uid 999 / gid 1000 and chowns /data to that itself.
+  - { path: /srv/redis, owner: "999", group: "1000", mode: "0750" }
+  - { path: /srv/beszel, owner: root, group: root, mode: "0755" }

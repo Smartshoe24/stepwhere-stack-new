@@ -1,0 +1,20 @@
+---
+# Configure the prod host. Run via `make host-check` (--check --diff) then `make host-apply`.
+- name: Configure the Stepwhere prod host
+  hosts: prod
+  become: true
+  roles:
+    - { role: base, tags: [base] }
+    - { role: docker, tags: [docker] }
+    - { role: infisical, tags: [infisical] }
+    - { role: stack, tags: [stack] }
+    - { role: pangolin, tags: [pangolin] }
+    - { role: monitoring, tags: [monitoring] }
+    - { role: backups, tags: [backups] }
+  post_tasks:
+    # Last, because the services need the Pangolin config and the monitoring directories.
+    - name: Bring the Compose project up
+      ansible.builtin.include_role:
+        name: stack
+        tasks_from: up.yml
+      tags: [stack, up]

@@ -1,0 +1,8 @@
+{
+  "android": {
+    "package": "com.vael36.stepwhere"
+  },
+  "ios": {
+    "bundleIdentifier": "com.vael36.stepwhere"
+  }
+}

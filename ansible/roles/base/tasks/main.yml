@@ -1,0 +1,80 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Apply all pending updates
+  ansible.builtin.apt:
+    upgrade: dist
+
+- name: Configure unattended upgrades (security only, no automatic reboot)
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/apt/apt.conf.d/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - 20auto-upgrades
+    - 50unattended-upgrades
+
+- name: Set the timezone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Use the Amazon Time Sync Service
+  ansible.builtin.template:
+    src: aws-time.sources.j2
+    dest: /etc/chrony/sources.d/aws.sources
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+- name: Enable chrony
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+
+- name: Create the journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cap journald disk use
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: /etc/systemd/journald.conf.d/stepwhere.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Harden sshd (keys only, no root)
+  ansible.builtin.template:
+    src: sshd.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-stepwhere.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Include swap and sysctl tasks
+  ansible.builtin.import_tasks: swap.yml
+
+- name: Include users tasks
+  ansible.builtin.import_tasks: users.yml
+
+- name: Include data volume tasks
+  ansible.builtin.import_tasks: data_volume.yml
+
+- name: Apply pending handlers before later roles rely on this one
+  ansible.builtin.meta: flush_handlers

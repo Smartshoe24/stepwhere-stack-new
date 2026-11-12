@@ -1,0 +1,96 @@
+services:
+  server:
+    image: ${SERVER_IMAGE_REPOSITORY}:${SERVER_IMAGE_TAG}
+    container_name: stepwhere-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8223:8223"
+    environment:
+      NODE_ENV: production
+      PORT: "8223"
+      INFISICAL_TOKEN: ${INFISICAL_TOKEN}
+      INFISICAL_ENV: ${INFISICAL_ENV}
+      INFISICAL_PROJECT_ID: ${INFISICAL_SERVER_PROJECT_ID}
+      INFISICAL_PATH: ${INFISICAL_PATH:-/}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8223/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  admin:
+    image: ${ADMIN_IMAGE_REPOSITORY}:${ADMIN_IMAGE_TAG}
+    container_name: stepwhere-admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4800:80"
+
+  share-view:
+    image: ${SHARE_VIEW_IMAGE_REPOSITORY}:${SHARE_VIEW_IMAGE_TAG}
+    container_name: stepwhere-share-view
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4810:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  device-ingest-proxy:
+    image: ${DEVICE_INGEST_PROXY_IMAGE_REPOSITORY}:${DEVICE_INGEST_PROXY_IMAGE_TAG}
+    container_name: stepwhere-device-ingest-proxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8290:8290"
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8290/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: stepwhere-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+    volumes:
+      - stepwhere_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: stepwhere-caddy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - stepwhere_caddy_data:/data
+      - stepwhere_caddy_config:/config
+
+volumes:
+  stepwhere_redis_data:
+  stepwhere_caddy_data:
+  stepwhere_caddy_config:

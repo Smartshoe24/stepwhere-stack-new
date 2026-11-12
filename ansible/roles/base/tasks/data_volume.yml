@@ -1,0 +1,66 @@
+---
+- name: Check the DataVolumeId instance tag
+  ansible.builtin.assert:
+    that:
+      - base_data_volume_id is match('^vol-[0-9a-f]+$')
+    fail_msg: >-
+      The instance has no usable DataVolumeId tag (got '{{ base_data_volume_id }}').
+      Check the inventory: `ansible-inventory --host <instance-id>` must show tags.DataVolumeId.
+    quiet: true
+
+- name: Find the data volume device
+  ansible.builtin.stat:
+    path: "{{ base_data_device }}"
+    follow: true
+  register: base_data_stat
+
+- name: Check the data volume is attached
+  ansible.builtin.assert:
+    that:
+      - base_data_stat.stat.exists
+      - base_data_stat.stat.isblk
+    fail_msg: "{{ base_data_device }} is not a block device. Is the EBS volume attached?"
+    quiet: true
+
+# blkid exits 2 when it finds no filesystem. Nothing here ever reformats a device that has one.
+- name: Look for an existing filesystem on the data volume
+  ansible.builtin.command:
+    cmd: "blkid -o value -s TYPE {{ base_data_device }}"
+  register: base_data_fstype
+  changed_when: false
+  failed_when: base_data_fstype.rc not in [0, 2]
+  check_mode: false
+
+- name: Create the filesystem on an empty data volume
+  community.general.filesystem:
+    dev: "{{ base_data_device }}"
+    fstype: ext4
+    opts: "-L {{ base_data_label }}"
+    force: false
+  when: base_data_fstype.rc == 2
+
+- name: Read the filesystem UUID
+  ansible.builtin.command:
+    cmd: "blkid -o value -s UUID {{ base_data_device }}"
+  register: base_data_uuid
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode or base_data_fstype.rc == 0
+
+- name: Mount the data volume by UUID
+  ansible.posix.mount:
+    path: "{{ base_data_mount }}"
+    src: "UUID={{ base_data_uuid.stdout }}"
+    fstype: ext4
+    opts: defaults,nofail
+    state: mounted
+  when: not ansible_check_mode or base_data_fstype.rc == 0
+
+- name: Create the data directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop: "{{ base_data_dirs }}"

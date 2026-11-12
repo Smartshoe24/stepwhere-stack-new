@@ -1,0 +1,18 @@
+---
+# Run last (site.yml post_tasks): needs the Pangolin config and the monitoring directories.
+- name: Check that Docker is installed (skipped checks in --check on a fresh host)
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: stack_docker_stat
+
+- name: Bring the Compose project up
+  community.docker.docker_compose_v2:
+    project_src: "{{ stack_dir }}"
+    files:
+      - compose.yml
+    services: "{{ stack_services if stack_services | length > 0 else omit }}"
+    state: present
+    pull: missing
+  when:
+    - stack_start | bool
+    - stack_docker_stat.stat.exists

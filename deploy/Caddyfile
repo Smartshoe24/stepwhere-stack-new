@@ -1,0 +1,67 @@
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+api.stepwhere.in {
+	encode zstd gzip
+	import security_headers
+
+	log {
+		output file /data/caddy/api-access.log
+		format console
+	}
+
+	@share_tokens path /v1/share-links/*
+	@invite_tokens path /v1/public/family-invites/preview
+	log_skip @share_tokens
+	log_skip @invite_tokens
+
+	tls {
+		key_type rsa2048
+		protocols tls1.2 tls1.3
+		ciphers TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+	}
+
+	reverse_proxy 127.0.0.1:8223
+}
+
+share.stepwhere.in {
+	encode zstd gzip
+	import security_headers
+
+	header {
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.google.com; worker-src 'self' blob:"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+	}
+
+	handle_path /__share_api/* {
+		log_skip
+		reverse_proxy 127.0.0.1:8223
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4810
+	}
+}
+
+panel.stepwhere.in {
+	encode zstd gzip
+	import security_headers
+
+	reverse_proxy 127.0.0.1:4800
+}
+
+http://ingest.stepwhere.in {
+	reverse_proxy 127.0.0.1:8290
+}

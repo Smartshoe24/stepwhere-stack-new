@@ -1,0 +1,15 @@
+{
+  "name": "@stepwhere/firmware",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bash scripts/build-arduino.sh",
+    "build:capture": "bash scripts/build-arduino.sh capture",
+    "build:dev": "bash scripts/build-arduino.sh dev",
+    "build:accel-test": "bash scripts/build-arduino.sh accel-test",
+    "build:experiment-wifi": "bash scripts/build-arduino.sh experiment-wifi",
+    "build:wifi-experiment-final": "bash scripts/build-arduino.sh wifi-experiment-final",
+    "build:qa": "bash scripts/build-arduino.sh qa",
+    "test": "bash scripts/test-host.sh"
+  }
+}

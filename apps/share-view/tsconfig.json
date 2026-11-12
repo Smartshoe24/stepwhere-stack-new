@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["google.maps", "vite/client"],
+    "noEmit": true
+  },
+  "include": ["src"]
+}

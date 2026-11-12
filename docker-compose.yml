@@ -1,0 +1,72 @@
+# Pinned so every checkout shares the same Postgres/Redis containers and volumes.
+name: stepwhere
+
+services:
+  postgres:
+    # Matches production (RDS PostgreSQL 18).
+    image: postgres:18-alpine
+    container_name: stepwhere-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Postgres 18 images keep data in /var/lib/postgresql/18/docker and expect
+      # the volume at /var/lib/postgresql. This is a new, empty volume: the old
+      # Postgres 16 volume (stepwhere_postgres_data) is left untouched and can't
+      # be opened by 18 without pg_upgrade. Run `pnpm --filter @stepwhere/server
+      # db:migrate:local` after the first start.
+      - stepwhere_pg18_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: stepwhere-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+    environment:
+      # The healthcheck runs inside the container and needs the password too.
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - stepwhere_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Dev edge for `pnpm dev:public` (dev/Caddyfile). Pinggy tunnels end here.
+  caddy:
+    image: caddy:2-alpine
+    container_name: stepwhere-dev-edge
+    profiles: ["public"]
+    ports:
+      - "127.0.0.1:8800:80"
+    environment:
+      STEPWHERE_SHARE_HOST: ${STEPWHERE_SHARE_HOST:-share.invalid}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./dev/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./apps/qa-agent/release:/srv/downloads:ro
+
+volumes:
+  stepwhere_pg18_data:
+  stepwhere_redis_data:

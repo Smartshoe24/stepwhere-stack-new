@@ -1,0 +1,11 @@
+# Managed by Ansible.
+[Unit]
+Description=Schedule: {{ item.description }}
+
+[Timer]
+OnCalendar={{ item.schedule }}
+# Run at boot if the host was off at the scheduled time.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

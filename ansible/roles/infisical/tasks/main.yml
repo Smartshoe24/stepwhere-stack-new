@@ -1,0 +1,36 @@
+---
+- name: Add Infisical's apt repository
+  ansible.builtin.deb822_repository:
+    name: infisical
+    types: deb
+    uris: https://artifacts-cli.infisical.com/deb
+    suites: stable
+    components: main
+    architectures:
+      - "{{ infisical_apt_arch }}"
+    signed_by: https://artifacts-cli.infisical.com/infisical.gpg
+    state: present
+  register: infisical_repo
+
+- name: Install the Infisical CLI
+  ansible.builtin.apt:
+    name: infisical
+    state: present
+    update_cache: "{{ infisical_repo is changed }}"
+
+- name: Create /etc/stepwhere
+  ansible.builtin.file:
+    path: "{{ infisical_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the Infisical token for the server container
+  ansible.builtin.copy:
+    content: "INFISICAL_TOKEN={{ vault_infisical_token }}\n"
+    dest: "{{ infisical_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true

@@ -1,0 +1,22 @@
+---
+- name: Create the docker group
+  ansible.builtin.group:
+    name: docker
+    system: true
+    state: present
+
+- name: Create the deploy user (docker group, no sudo)
+  ansible.builtin.user:
+    name: "{{ base_deploy_user }}"
+    shell: /bin/bash
+    groups: docker
+    append: true
+    create_home: true
+    password_lock: true
+
+- name: Authorise deploy keys
+  ansible.posix.authorized_key:
+    user: "{{ base_deploy_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ base_deploy_authorized_keys }}"

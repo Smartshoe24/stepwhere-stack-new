@@ -1,0 +1,39 @@
+---
+backups_bucket: "{{ s3_backups_bucket }}"
+backups_region: "{{ aws_region }}"
+backups_aws_cli_image: "{{ aws_cli_image }}"
+backups_postgres_image: "{{ postgres_client_image }}"
+
+backups_rds_endpoint: "{{ rds_endpoint }}"
+backups_rds_database: "{{ rds_database }}"
+backups_rds_user: "{{ rds_backup_user }}"
+backups_rds_password: "{{ vault_rds_backup_password }}"
+backups_rds_ca_url: https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+backups_rds_ca_file: /etc/stepwhere/rds-ca.pem
+
+# Optional dead-man's-switch ping URLs (healthchecks.io). Empty = no ping.
+backups_healthchecks_db_url: "{{ vault_healthchecks_db_url | default('') }}"
+backups_healthchecks_config_url: "{{ vault_healthchecks_config_url | default('') }}"
+
+# systemd OnCalendar, UTC. 21:00 UTC = 02:30 IST; 21:30 UTC = 03:00 IST.
+# The database job is skipped while rds_endpoint is empty.
+backups_jobs:
+  - name: stepwhere-db-backup
+    description: Stepwhere PostgreSQL dump to S3
+    schedule: "*-*-* 21:00:00 UTC"
+    enabled: "{{ backups_rds_endpoint | length > 0 }}"
+  - name: stepwhere-config-backup
+    description: Stepwhere config archive (Pangolin, Beszel) to S3
+    schedule: "*-*-* 21:30:00 UTC"
+    enabled: true
+
+# Directories (under /srv) archived by stepwhere-config-backup.
+backups_config_paths:
+  - pangolin
+  - beszel
+backups_config_excludes:
+  - beszel/socket
+
+backups_env_file: /etc/stepwhere/backups.env
+backups_lib_dir: /usr/local/lib/stepwhere
+backups_bin_dir: /usr/local/sbin

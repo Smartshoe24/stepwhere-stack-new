@@ -1,0 +1,42 @@
+:80 {
+	root * /srv/share-view
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.google.com; worker-src 'self' blob:"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+	}
+
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-store"
+	header /.well-known/* Cache-Control "public, max-age=3600"
+	header /.well-known/* Content-Type "application/json"
+
+	handle /health {
+		respond "ok" 200
+	}
+
+	# Share API (HTTP and the live WebSocket) on the same origin as the page.
+	# Moved here from the old edge Caddy: the prefix is stripped and requests go
+	# to the API container. Paths carry share tokens, so they are never logged.
+	handle_path /__share_api/* {
+		log_skip
+		reverse_proxy {$SHARE_API_UPSTREAM:server:8223} {
+			# The API sets its own security headers; drop them so this site's
+			# headers above are the only copy (reverse_proxy appends otherwise).
+			header_down -Strict-Transport-Security
+			header_down -X-Content-Type-Options
+			header_down -Referrer-Policy
+		}
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

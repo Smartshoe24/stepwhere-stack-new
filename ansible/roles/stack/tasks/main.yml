@@ -1,0 +1,35 @@
+---
+- name: Check required settings
+  ansible.builtin.assert:
+    that:
+      - infisical_project_id | length > 0
+      - vault_redis_password | length > 0
+    fail_msg: Set infisical_project_id in group_vars/prod/main.yml and vault_redis_password in vault.yml.
+    quiet: true
+
+- name: Create the Compose project directory
+  ansible.builtin.file:
+    path: "{{ stack_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the Compose environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ stack_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Write compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ stack_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+    # `config -q` also needs .env; the env file is written first.
+    validate: docker compose -f %s --env-file {{ stack_dir }}/.env config --quiet
