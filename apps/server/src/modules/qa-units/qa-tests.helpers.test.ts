@@ -92,7 +92,7 @@ describe("applyTtlMessage", () => {
 });
 
 describe("combineBoardTestRuns", () => {
-  const ids = ["power", "imu", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps"] as const;
+  const ids = ["power", "imu", "flash", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps"] as const;
   const full = (overrides: Partial<Record<(typeof ids)[number], "passed" | "failed" | "skipped">> = {}) => ({
     results: emptyResults(ids).map((entry) => ({ ...entry, status: overrides[entry.id] ?? "passed" })),
   });

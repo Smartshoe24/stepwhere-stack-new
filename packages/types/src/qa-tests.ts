@@ -16,6 +16,7 @@ export const QA_TTL_START_COMMAND = "QA GO";
 export const QA_BOARD_TEST_IDS = [
   "power",
   "imu",
+  "flash",
   "modem",
   "sim",
   "gsm",
@@ -33,6 +34,10 @@ export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description:
   imu: {
     label: "Accelerometer",
     description: "LIS2DH12 (WHO_AM_I 0x33) or LIS2DS12 (0x43) answers on I2C and reads about 1 g at rest.",
+  },
+  flash: {
+    label: "Memory chip",
+    description: "The W25Q128 external flash answers with JEDEC ID EF 40 18. Read-only: nothing is erased or written.",
   },
   modem: { label: "Modem", description: "N706 answers AT after power-on." },
   sim: { label: "SIM", description: "SIM is ready; IMEI and ICCID are read." },

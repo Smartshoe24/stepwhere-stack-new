@@ -70,12 +70,18 @@ const all = (status: QaTestResultDto['status']) =>
 
 describe('describeSlot', () => {
   it('shows the running test and its step', () => {
+    const gsm = QA_BOARD_TEST_IDS.indexOf('gsm')
     const results = all('pending').map((entry, index) =>
-      index < 4 ? { ...entry, status: 'passed' as const } : index === 4 ? { ...entry, status: 'running' as const } : entry
+      index < gsm ? { ...entry, status: 'passed' as const } : index === gsm ? { ...entry, status: 'running' as const } : entry
     )
     const view = describeSlot(slot({ run: run(results, 'running') }))
-    expect(view).toMatchObject({ phase: 'testing', headline: 'GSM', step: { index: 5, of: 10 }, passed: 4 })
-    expect(view.segments[4].status).toBe('running')
+    expect(view).toMatchObject({
+      phase: 'testing',
+      headline: 'GSM',
+      step: { index: gsm + 1, of: QA_BOARD_TEST_IDS.length },
+      passed: gsm,
+    })
+    expect(view.segments[gsm].status).toBe('running')
   })
 
   it('asks for Start when the step test waits for the operator', () => {
@@ -117,7 +123,7 @@ describe('describeSlot', () => {
     const view = describeSlot(
       slot({ run: run(all('passed'), 'passed'), verdict: { status: 'passed', failing: [], untested: [] } })
     )
-    expect(view).toMatchObject({ phase: 'passed', passed: 10, failed: 0 })
+    expect(view).toMatchObject({ phase: 'passed', passed: QA_BOARD_TEST_IDS.length, failed: 0 })
   })
 
   it('treats a skipped step test as not finished, not passed', () => {

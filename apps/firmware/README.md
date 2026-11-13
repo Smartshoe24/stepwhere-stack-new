@@ -560,6 +560,7 @@ eight minutes, most of it waiting for a GPS fix.
 |---|---|
 | `power` | Battery ≥ 3400 mV (the main firmware's modem cut-off) |
 | `imu` | The accelerometer is found by `WHO_AM_I` (LIS2DH12 `0x33` at 0x19/0x18, or LIS2DS12 `0x43` at 0x1D/0x1E) and reads about 1 g at rest |
+| `flash` | The W25Q128 memory chip (IC8, SPI1, /CS PC6) answers `9Fh` with JEDEC ID `EF 40 18`. Read-only: nothing is erased or written |
 | `modem` | N706 answers `AT` after the power key; IMEI read (also printed as `[IMEI] …`) |
 | `sim` | `AT+CPIN?` is `READY` within 15 s; ICCID read |
 | `gsm` | Registered on LTE (`AT+CEREG?` 1 or 5) within **15 s** of the power key |
