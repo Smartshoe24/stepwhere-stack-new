@@ -17,6 +17,9 @@ export function formatSeconds(ms: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+/** "EF4018" → "EF 40 18", the way the memory chip's ID is usually written. */
+const spacedHex = (hex: string) => hex.match(/.{1,2}/g)?.join(' ') ?? hex
+
 export function testLabel(id: QaTestResultDto['id']) {
   return QA_BOARD_TESTS[id]?.label ?? id
 }
@@ -31,11 +34,25 @@ export function summarizeResult(result: QaTestResultDto): string | null {
       return mv != null ? `${(mv / 1000).toFixed(2)} V` : null
     }
     case 'imu': {
+      // qa-0.3.0 and later name the sensor it found; older runs only report WHO_AM_I.
+      const chip = str(data, 'chip')
+      const address = str(data, 'address')
       const who = str(data, 'whoAmI')
       const mg = num(data, 'restMg')
-      return [who && `WHO_AM_I ${who}`, mg != null && `${mg} mg at rest`]
+      return [
+        chip ? `${chip}${address ? ` at ${address}` : ''}` : who && `WHO_AM_I ${who}`,
+        mg != null && `${mg} mg at rest`,
+      ]
         .filter(Boolean)
         .join(' · ')
+    }
+    case 'flash': {
+      const id = str(data, 'jedecId')
+      const expected = str(data, 'expected')
+      if (!id) return null
+      return id === expected || !expected
+        ? `ID ${spacedHex(id)}`
+        : `ID ${spacedHex(id)} · expected ${spacedHex(expected)}`
     }
     case 'modem': {
       const imei = str(data, 'imei')
@@ -82,7 +99,15 @@ export function summarizeResult(result: QaTestResultDto): string | null {
     case 'steps': {
       const steps = num(data, 'steps')
       const target = num(data, 'target')
-      return steps != null ? `${steps}/${target ?? '?'} steps` : null
+      // LIS2DH12 boards count with the shoe pedometer: one swing is one stride.
+      const swings = num(data, 'strides')
+      if (steps == null) return null
+      return [
+        `${steps}/${target ?? '?'} steps`,
+        swings != null && `${swings} swing${swings === 1 ? '' : 's'}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'gps': {
       const fixMs = num(data, 'fixMs')

@@ -551,7 +551,10 @@ still to come.) Build it with:
 pnpm --filter @stepwhere/firmware build:qa
 ```
 
-Artifacts land in `.builds/artifacts/qa/stepwhere.qa.ino.*`. On the Bench,
+The QA build targets **Generic G070CBTx** (`pnum=GENERIC_G070CBTX`): Rev11 boards
+carry an STM32G070CBT6, and this is the target the production firmware v2.2.0
+in `Smartshoe24/Stepwhere-Firmware` was tested with. Artifacts land in
+`.builds/artifacts/qa/stepwhere.qa.ino.*`. On the Bench,
 upload the BIN or HEX with channel **QA firmware**, open the serial console,
 then flash: the tests start as soon as the board boots and take up to about
 eight minutes, most of it waiting for a GPS fix.
@@ -559,14 +562,15 @@ eight minutes, most of it waiting for a GPS fix.
 | Test | Pass when |
 |---|---|
 | `power` | Battery ≥ 3400 mV (the main firmware's modem cut-off) |
-| `imu` | LIS2DS12 answers at 0x1D with `WHO_AM_I` 0x43 and reads about 1 g at rest |
+| `imu` | The accelerometer is found by `WHO_AM_I` (LIS2DH12 `0x33` at 0x19/0x18, or LIS2DS12 `0x43` at 0x1D/0x1E) and reads about 1 g at rest |
+| `flash` | The W25Q128 memory chip (IC8, SPI1, /CS PC6) answers `9Fh` with JEDEC ID `EF 40 18`. Read-only: nothing is erased or written |
 | `modem` | N706 answers `AT` after the power key; IMEI read (also printed as `[IMEI] …`) |
 | `sim` | `AT+CPIN?` is `READY` within 15 s; ICCID read |
 | `gsm` | Registered on LTE (`AT+CEREG?` 1 or 5) within **15 s** of the power key |
 | `wifi` | `AT+WIFIAPSCAN` sees at least one access point |
 | `cell` | `AT+NETDMSG` parses as a valid LTE serving cell |
 | `data` | `AT+XIIC` brings up a data IP within 60 s of the power key |
-| `steps` | After **Start**, 10 step interrupts on INT2 within 60 s while the operator walks or swings the board |
+| `steps` | After **Start**, 10 steps within 60 s while the operator walks or swings the board: from the shoe pedometer (`src/pedometer.h`) on a LIS2DH12, or step interrupts on INT2 on a LIS2DS12 |
 | `gps` | NMEA within 5 s, then a fix with 4+ satellites within **7 min** of GPS power-on |
 
 Each run power-cycles the modem and GPS rail first, so the GSM and GPS clocks
@@ -579,6 +583,15 @@ press Start" and counts only after `QA GO` (the Bench's **Start** button). With
 30 boards on a bench, each is walked when the operator gets to its slot. If
 nobody presses Start within 10 minutes the test is skipped, which leaves the
 unit untested rather than failed; `QA RUN steps` tries again.
+
+On a LIS2DH12 board the step test runs the same shoe pedometer as the main
+firmware, on the same 25 Hz FIFO stream. That pedometer counts one stride (two
+steps) per burst of motion and only accepts a burst that starts from a still
+moment, as a foot does in stance, so 10 steps means about five heel-to-toe
+swings with a short pause between them. Steady shaking without pauses is
+rejected (`tooLong` in the result data), as in the shoe. The result also
+reports the pedometer's burst, stride and reject counts to help diagnose a
+failure.
 
 Console commands (the Bench's **Run board tests**, **Start** and **Retry**
 buttons type these): `QA RUN`, `QA RUN <test>` (also runs what it needs, e.g.

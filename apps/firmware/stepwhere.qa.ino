@@ -15,8 +15,14 @@
  *   USART1 PB6 TX / PB7 RX  115200  console + @QA lines
  *   USART2 PA2 TX / PA3 RX  115200  Neoway N706 modem
  *   USART3 PB8 TX / PB9 RX  9600    G7A GPS
- *   I2C PA12 SDA / PA11 SCL         LIS2DS12 (SA0 PA1 high = 0x1D, INT2 PB4 = step)
+ *   I2C PA12 SDA / PA11 SCL         accelerometer, SA0 PA1 driven high, INT2 PB4
+ *   SPI1 PA7 MOSI / PA6 MISO / PA5 SCK, /CS PC6, /WP PC7, /HOLD PB12   W25Q128 flash
  *   PA10 LDO_EN (modem + GPS rail), PB13 modem PWRKEY, PB10 battery ADC
+ *
+ * Accelerometer: found by WHO_AM_I, like stepwhere.ino. A LIS2DH12 (0x33 at
+ * 0x19 or 0x18) is read through its FIFO and its steps come from the shoe
+ * pedometer in src/pedometer.h; a LIS2DS12 (0x43 at 0x1D or 0x1E) uses its
+ * hardware step counter on INT2.
  *
  * Console commands: QA RUN, QA RUN <test>, QA GO, QA ABORT, QA STATUS, QA HELP.
  * The step test waits for QA GO (the Start button in admin), so on a bench of
@@ -25,13 +31,16 @@
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include <SPI.h>
 #include <TinyGPSPlus.h>
 #include <Wire.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define QA_FW_VERSION "qa-0.2.0"
+#include "src/pedometer.h"
+
+#define QA_FW_VERSION "qa-0.4.0"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -55,11 +64,41 @@ constexpr int32_t ACCEL_MAX_MG = 1300;
 #define BATTERY_ADC PB10
 #define I2C_SDA PA12
 #define I2C_SCL PA11
-#define LIS2DS12_SA0 PA1
-#define LIS2DS12_INT2 PB4
-#define LIS2DS12_ADDRESS 0x1D
-#define LIS2DS12_WHO_AM_I 0x0F
+#define ACCEL_SA0 PA1
+#define ACCEL_INT2 PB4
+#define ACCEL_REG_WHO_AM_I 0x0F
 #define LIS2DS12_WHO_AM_I_VALUE 0x43
+#define LIS2DH12_WHO_AM_I_VALUE 0x33
+
+// LIS2DH12 registers and the configuration stepwhere.ino ships.
+#define LIS2DH12_CTRL_REG1 0x20
+#define LIS2DH12_CTRL_REG2 0x21
+#define LIS2DH12_CTRL_REG3 0x22
+#define LIS2DH12_CTRL_REG4 0x23
+#define LIS2DH12_CTRL_REG5 0x24
+#define LIS2DH12_CTRL_REG6 0x25
+#define LIS2DH12_OUT_X_L 0x28
+#define LIS2DH12_FIFO_CTRL 0x2E
+#define LIS2DH12_FIFO_SRC 0x2F
+#define LIS2DH12_ODR_25HZ_XYZ 0x37   // CTRL_REG1: 25 Hz, normal mode, X/Y/Z on
+#define LIS2DH12_BDU_8G 0xA0         // CTRL_REG4: block data update, ±8 g
+#define LIS2DH12_FIFO_ENABLE 0x40    // CTRL_REG5
+#define LIS2DH12_FIFO_STREAM 0x80    // FIFO_CTRL: stream mode
+
+constexpr uint32_t ACCEL_POLL_INTERVAL_MS = 200;  // same as stepwhere.ino; the FIFO holds 1.28 s
+
+// W25Q128 external flash (IC8). Same pins as the OTA flash driver. It sits on the
+// MCU supply (it answers with the modem/GPS rail off), so the test needs nothing first.
+#define FLASH_MOSI PA7
+#define FLASH_MISO PA6
+#define FLASH_SCK PA5
+#define FLASH_CS PC6
+#define FLASH_WP PC7     // driven high: low blocks status-register writes
+#define FLASH_HOLD PB12  // driven high: low pauses the chip and reads return 0xFF
+constexpr uint32_t FLASH_JEDEC_EXPECTED = 0xEF4018;  // Winbond (EF), W25Q128 (40 18)
+constexpr uint32_t FLASH_SPI_HZ = 4000000;
+constexpr uint8_t FLASH_CMD_RELEASE_PD = 0xAB;
+constexpr uint8_t FLASH_CMD_JEDEC_ID = 0x9F;
 
 constexpr uint32_t CONSOLE_BAUD = 115200;
 constexpr uint32_t GSM_BAUD = 115200;
@@ -76,19 +115,22 @@ HardwareSerial SerialGSM(PA3, PA2);
 HardwareSerial SerialGPS(PB9, PB8);
 HardwareSerial SerialDBG(PB7, PB6);
 TwoWire qaI2c(I2C_SDA, I2C_SCL);
+SPIClass flashSpi(FLASH_MOSI, FLASH_MISO, FLASH_SCK);
 TinyGPSPlus gps;
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
-enum TestId : uint8_t { T_POWER, T_IMU, T_MODEM, T_SIM, T_GSM, T_WIFI, T_CELL, T_DATA, T_STEPS, T_GPS, TEST_COUNT };
+// Same order as QA_BOARD_TEST_IDS in packages/types/src/qa-tests.ts.
+enum TestId : uint8_t { T_POWER, T_IMU, T_FLASH, T_MODEM, T_SIM, T_GSM, T_WIFI, T_CELL, T_DATA, T_STEPS, T_GPS, TEST_COUNT };
 
 const char *const TEST_NAMES[TEST_COUNT] = {
-  "power", "imu", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps",
+  "power", "imu", "flash", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps",
 };
 
 // Running one test also runs what it needs first.
 const uint16_t TEST_NEEDS[TEST_COUNT] = {
   0,                                                       // power
   0,                                                       // imu
+  0,                                                       // flash
   (1 << T_POWER),                                          // modem
   (1 << T_POWER) | (1 << T_MODEM),                         // sim
   (1 << T_POWER) | (1 << T_MODEM) | (1 << T_SIM),          // gsm
@@ -133,6 +175,12 @@ struct ServingCell {
 
 char chipUid[25] = "";
 volatile uint32_t stepInterrupts = 0;
+
+enum class AccelChip : uint8_t { None, Lis2ds12, Lis2dh12 };
+AccelChip accelChip = AccelChip::None;
+uint8_t accelAddress = 0;
+stepwhere::ShoePedometer pedometer;
+uint16_t accelOverruns = 0;  // LIS2DH12 FIFO overruns during the step test
 
 // ─── Console and @QA lines ────────────────────────────────────────────────────
 
@@ -514,26 +562,81 @@ bool parse_netdmsg(const char *reply, ServingCell &cell, const char *&error) {
   return true;
 }
 
-// ─── LIS2DS12 ─────────────────────────────────────────────────────────────────
+// ─── Accelerometer (LIS2DH12 or LIS2DS12) ────────────────────────────────────
 
-void imu_write(uint8_t reg, uint8_t value) {
-  qaI2c.beginTransmission(LIS2DS12_ADDRESS);
-  qaI2c.write(reg);
-  qaI2c.write(value);
-  qaI2c.endTransmission();
-}
-
-bool imu_read(uint8_t reg, uint8_t *out, uint8_t count) {
-  qaI2c.beginTransmission(LIS2DS12_ADDRESS);
-  qaI2c.write(count > 1 ? (reg | 0x80) : reg);
+bool accel_read_at(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count) {
+  qaI2c.beginTransmission(address);
+  qaI2c.write(count > 1 ? (reg | 0x80) : reg);  // MSB set = auto-increment on both chips
   if (qaI2c.endTransmission(false) != 0) return false;
-  if (qaI2c.requestFrom(LIS2DS12_ADDRESS, count) != count) return false;
+  if (qaI2c.requestFrom(address, count) != count) return false;
   for (uint8_t i = 0; i < count; i++) out[i] = qaI2c.read();
   return true;
 }
 
-/** Same register setup as stepwhere.ino, so the step test exercises the shipping config. */
-void imu_configure() {
+bool imu_write(uint8_t reg, uint8_t value) {
+  qaI2c.beginTransmission(accelAddress);
+  qaI2c.write(reg);
+  qaI2c.write(value);
+  return qaI2c.endTransmission() == 0;
+}
+
+bool imu_read(uint8_t reg, uint8_t *out, uint8_t count) {
+  return accel_read_at(accelAddress, reg, out, count);
+}
+
+/**
+ * Finds the accelerometer the way stepwhere.ino does: SA0 is driven high, and
+ * the alternate addresses cover boards wired the other way. Sets accelChip and
+ * accelAddress. `whoAmIOut` gets the last ID read. Returns false if no address
+ * answered at all (a part can answer and still read 0x00).
+ */
+bool accel_detect(uint8_t &whoAmIOut) {
+  accelChip = AccelChip::None;
+  accelAddress = 0;
+  whoAmIOut = 0;
+  bool anyAnswered = false;
+  const uint8_t lis2dh12Addresses[] = {0x19, 0x18};
+  const uint8_t lis2ds12Addresses[] = {0x1D, 0x1E};
+  for (uint8_t attempt = 0; attempt < 5 && accelChip == AccelChip::None; attempt++) {
+    if (attempt) wait_ms(20);
+    for (uint8_t address : lis2dh12Addresses) {
+      uint8_t id = 0;
+      if (accelChip != AccelChip::None || !accel_read_at(address, ACCEL_REG_WHO_AM_I, &id, 1)) continue;
+      anyAnswered = true;
+      whoAmIOut = id;
+      if (id == LIS2DH12_WHO_AM_I_VALUE) {
+        accelChip = AccelChip::Lis2dh12;
+        accelAddress = address;
+      }
+    }
+    for (uint8_t address : lis2ds12Addresses) {
+      uint8_t id = 0;
+      if (accelChip != AccelChip::None || !accel_read_at(address, ACCEL_REG_WHO_AM_I, &id, 1)) continue;
+      anyAnswered = true;
+      whoAmIOut = id;
+      if (id == LIS2DS12_WHO_AM_I_VALUE) {
+        accelChip = AccelChip::Lis2ds12;
+        accelAddress = address;
+      }
+    }
+  }
+  return anyAnswered;
+}
+
+const char *accel_chip_name() {
+  switch (accelChip) {
+    case AccelChip::Lis2dh12: return "LIS2DH12";
+    case AccelChip::Lis2ds12: return "LIS2DS12";
+    default: return nullptr;
+  }
+}
+
+void on_step_interrupt() {
+  stepInterrupts++;
+}
+
+/** LIS2DS12: same register setup as stepwhere.ino, so the step test exercises the shipping config. */
+void lis2ds12_configure() {
   imu_write(0x20, 0x60);  // CTRL1: 400 Hz, ±2 g
   imu_write(0x3F, 0x01);  // FUNC_CTRL: step counter
   imu_write(0x21, 0x00);  // CTRL2
@@ -543,10 +646,51 @@ void imu_configure() {
   imu_write(0x31, 0x0C);  // TAP_6D_THS
   imu_write(0x32, 0x7F);  // INT_DUR
   imu_write(0x33, 0x80);  // WAKE_UP_THS: single and double tap
+  // Step pulses arrive on INT2. As in stepwhere.ino, only a LIS2DS12 board uses it.
+  pinMode(ACCEL_INT2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ACCEL_INT2), on_step_interrupt, FALLING);
 }
 
-void on_step_interrupt() {
-  stepInterrupts++;
+/** LIS2DH12: same configuration as stepwhere.ino (25 Hz, ±8 g, FIFO stream). */
+bool lis2dh12_configure() {
+  imu_write(LIS2DH12_CTRL_REG1, 0x00);  // power down while configuring
+  imu_write(LIS2DH12_CTRL_REG2, 0x00);  // no high-pass: the pedometer needs gravity
+  imu_write(LIS2DH12_CTRL_REG3, 0x00);  // FIFO is polled, no interrupts
+  imu_write(LIS2DH12_CTRL_REG4, LIS2DH12_BDU_8G);
+  imu_write(LIS2DH12_CTRL_REG5, LIS2DH12_FIFO_ENABLE);
+  imu_write(LIS2DH12_CTRL_REG6, 0x00);
+  imu_write(LIS2DH12_FIFO_CTRL, 0x00);  // bypass clears the FIFO
+  imu_write(LIS2DH12_FIFO_CTRL, LIS2DH12_FIFO_STREAM);
+  imu_write(LIS2DH12_CTRL_REG1, LIS2DH12_ODR_25HZ_XYZ);
+  uint8_t ctrl1 = 0;
+  return imu_read(LIS2DH12_CTRL_REG1, &ctrl1, 1) && ctrl1 == LIS2DH12_ODR_25HZ_XYZ;
+}
+
+/**
+ * Reads every sample waiting in the LIS2DH12 FIFO, in mg, and hands each to
+ * `onSample`. Returns the number read; counts overruns like stepwhere.ino.
+ */
+template <typename OnSample>
+uint8_t lis2dh12_drain_fifo(OnSample onSample) {
+  uint8_t fifoSrc = 0;
+  if (!imu_read(LIS2DH12_FIFO_SRC, &fifoSrc, 1)) return 0;
+  uint8_t samples = fifoSrc & 0x1F;
+  if (fifoSrc & 0x40) {  // overrun: the FIFO is full and older samples were lost
+    samples = 32;
+    if (accelOverruns < UINT16_MAX) accelOverruns++;
+  }
+  uint8_t read = 0;
+  for (uint8_t i = 0; i < samples; i++) {
+    uint8_t raw[6];
+    if (!imu_read(LIS2DH12_OUT_X_L, raw, sizeof(raw))) break;
+    // Left-justified 10-bit output at ±8 g (16 mg/digit): the 16-bit word >> 2 is mg.
+    const int16_t x = (int16_t)(raw[0] | (raw[1] << 8)) >> 2;
+    const int16_t y = (int16_t)(raw[2] | (raw[3] << 8)) >> 2;
+    const int16_t z = (int16_t)(raw[4] | (raw[5] << 8)) >> 2;
+    onSample(x, y, z);
+    read++;
+  }
+  return read;
 }
 
 // ─── The tests ───────────────────────────────────────────────────────────────
@@ -575,42 +719,117 @@ void test_imu() {
   report_running(T_IMU);
   const uint32_t startedAt = millis();
   uint8_t whoAmI = 0;
-  if (!imu_read(LIS2DS12_WHO_AM_I, &whoAmI, 1)) {
-    result_line(T_IMU, Outcome::Fail, millis() - startedAt, "No answer at I2C 0x1D (check SDA PA12, SCL PA11, SA0)")
-      .data().str("address", "0x1D").end();
-    return;
-  }
+  const bool anyAnswered = accel_detect(whoAmI);
   char whoHex[5];
   snprintf(whoHex, sizeof(whoHex), "0x%02X", whoAmI);
-  if (whoAmI != LIS2DS12_WHO_AM_I_VALUE) {
-    result_line(T_IMU, Outcome::Fail, millis() - startedAt, "WHO_AM_I is not 0x43; wrong or damaged sensor")
-      .data().str("whoAmI", whoHex).end();
+
+  if (accelChip == AccelChip::None) {
+    if (!anyAnswered) {
+      result_line(T_IMU, Outcome::Fail, millis() - startedAt,
+                  "No answer at I2C 0x19/0x18/0x1D/0x1E (check SDA PA12, SCL PA11, SA0 PA1, sensor supply)")
+        .data().str("addresses", "0x19,0x18,0x1D,0x1E").end();
+    } else {
+      result_line(T_IMU, Outcome::Fail, millis() - startedAt,
+                  "WHO_AM_I is not 0x33 (LIS2DH12) or 0x43 (LIS2DS12); wrong or damaged sensor")
+        .data().str("whoAmI", whoHex).end();
+    }
     return;
   }
 
-  imu_configure();
-  wait_ms(100);
+  char addressHex[5];
+  snprintf(addressHex, sizeof(addressHex), "0x%02X", accelAddress);
+
   // Average a few samples; at rest the vector length is about 1 g.
   int32_t sumMg = 0;
   uint8_t samples = 0;
-  for (uint8_t i = 0; i < 8; i++) {
-    uint8_t raw[6];
-    if (imu_read(0x28, raw, 6)) {
-      const int16_t x = (int16_t)(raw[0] | (raw[1] << 8));
-      const int16_t y = (int16_t)(raw[2] | (raw[3] << 8));
-      const int16_t z = (int16_t)(raw[4] | (raw[5] << 8));
-      // ±2 g full scale: 0.061 mg per LSB of the 16-bit value.
-      const float mg = sqrtf((float)x * x + (float)y * y + (float)z * z) * 0.061f;
-      sumMg += (int32_t)mg;
-      samples++;
+  if (accelChip == AccelChip::Lis2dh12) {
+    if (!lis2dh12_configure()) {
+      result_line(T_IMU, Outcome::Fail, millis() - startedAt, "LIS2DH12 found but CTRL_REG1 did not take the configuration")
+        .data().str("chip", "LIS2DH12").str("address", addressHex).str("whoAmI", whoHex).end();
+      return;
     }
-    wait_ms(20);
+    // 25 Hz: about 8 samples in 340 ms. Skip the first ones after power-up.
+    wait_ms(120);
+    lis2dh12_drain_fifo([](int16_t, int16_t, int16_t) {});
+    wait_ms(340);
+    lis2dh12_drain_fifo([&](int16_t x, int16_t y, int16_t z) {
+      if (samples >= 16) return;
+      sumMg += (int32_t)stepwhere::isqrt32((uint32_t)((int32_t)x * x) + (uint32_t)((int32_t)y * y)
+                                           + (uint32_t)((int32_t)z * z));
+      samples++;
+    });
+  } else {
+    lis2ds12_configure();
+    wait_ms(100);
+    for (uint8_t i = 0; i < 8; i++) {
+      uint8_t raw[6];
+      if (imu_read(0x28, raw, 6)) {
+        const int16_t x = (int16_t)(raw[0] | (raw[1] << 8));
+        const int16_t y = (int16_t)(raw[2] | (raw[3] << 8));
+        const int16_t z = (int16_t)(raw[4] | (raw[5] << 8));
+        // ±2 g full scale: 0.061 mg per LSB of the 16-bit value.
+        const float mg = sqrtf((float)x * x + (float)y * y + (float)z * z) * 0.061f;
+        sumMg += (int32_t)mg;
+        samples++;
+      }
+      wait_ms(20);
+    }
   }
   const int32_t mg = samples ? sumMg / samples : 0;
   const bool ok = samples > 0 && mg >= ACCEL_MIN_MG && mg <= ACCEL_MAX_MG;
   result_line(T_IMU, ok ? Outcome::Pass : Outcome::Fail, millis() - startedAt,
-              ok ? nullptr : "Acceleration is not about 1 g; keep the board still and retest")
-    .data().str("whoAmI", whoHex).num("restMg", mg).end();
+              ok ? nullptr : samples == 0 ? "No samples read from the accelerometer"
+                                          : "Acceleration is not about 1 g; keep the board still and retest")
+    .data().str("chip", accel_chip_name()).str("address", addressHex).str("whoAmI", whoHex)
+    .num("restMg", mg).unum("samples", samples).num("minMg", ACCEL_MIN_MG).num("maxMg", ACCEL_MAX_MG).end();
+}
+
+/** One SPI command to the flash: sends `command`, then clocks out `count` bytes into `out`. */
+void flash_command(uint8_t command, uint8_t *out, uint8_t count) {
+  flashSpi.beginTransaction(SPISettings(FLASH_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(FLASH_CS, LOW);
+  flashSpi.transfer(command);
+  for (uint8_t i = 0; i < count; i++) out[i] = flashSpi.transfer(0x00);
+  digitalWrite(FLASH_CS, HIGH);
+  flashSpi.endTransaction();
+}
+
+/** Reads the W25Q128's JEDEC ID. Read-only: the chip is never erased or written. */
+void test_flash() {
+  report_running(T_FLASH);
+  const uint32_t startedAt = millis();
+  pinMode(FLASH_CS, OUTPUT);
+  digitalWrite(FLASH_CS, HIGH);
+  pinMode(FLASH_WP, OUTPUT);
+  digitalWrite(FLASH_WP, HIGH);
+  pinMode(FLASH_HOLD, OUTPUT);
+  digitalWrite(FLASH_HOLD, HIGH);
+  flashSpi.begin();
+  delay(1);
+
+  // The chip may have been left in deep power-down; it ignores 9Fh until released.
+  flash_command(FLASH_CMD_RELEASE_PD, nullptr, 0);
+  delayMicroseconds(50);  // tRES1 is 3 µs
+  uint8_t id[3] = {0, 0, 0};
+  flash_command(FLASH_CMD_JEDEC_ID, id, 3);
+  flashSpi.end();
+
+  const uint32_t jedec = ((uint32_t)id[0] << 16) | ((uint32_t)id[1] << 8) | id[2];
+  char idHex[7];
+  snprintf(idHex, sizeof(idHex), "%02X%02X%02X", id[0], id[1], id[2]);
+  char expectedHex[7];
+  snprintf(expectedHex, sizeof(expectedHex), "%06lX", (unsigned long)FLASH_JEDEC_EXPECTED);
+
+  const char *error = nullptr;
+  if (jedec == FLASH_JEDEC_EXPECTED) {
+    // pass
+  } else if (jedec == 0xFFFFFF) error = "No answer from the memory chip (MISO PA6 open, /CS PC6, /HOLD PB12 or its supply)";
+  else if (jedec == 0x000000) error = "Memory chip ID reads 00 00 00 (MISO PA6 stuck low, or the chip has no supply)";
+  else if (id[0] == 0xEF) error = "Winbond chip, but its ID is not EF 40 18 (a different part than the BOM's W25Q128)";
+  else error = "Unexpected memory chip ID (wrong part, or bad solder on IC8)";
+
+  result_line(T_FLASH, error ? Outcome::Fail : Outcome::Pass, millis() - startedAt, error)
+    .data().str("jedecId", idHex).str("expected", expectedHex).end();
 }
 
 void test_modem() {
@@ -809,13 +1028,46 @@ void test_data() {
     .data().str("ip", ok ? ip : nullptr).unum("limitMs", DATA_LIMIT_MS).end();
 }
 
-void test_steps() {
-  report_running(T_STEPS);
+// Step counting for the step test: INT2 pulses on a LIS2DS12, the shoe
+// pedometer on the LIS2DH12 FIFO stream (as stepwhere.ino does).
+uint32_t pedometerSteps = 0;
+uint32_t accelLastPoll = 0;
+
+void steps_reset() {
   noInterrupts();
   stepInterrupts = 0;
   interrupts();
+  if (accelChip == AccelChip::Lis2dh12) {
+    lis2dh12_drain_fifo([](int16_t, int16_t, int16_t) {});  // drop samples from before the window
+    pedometer.reset();
+    pedometerSteps = 0;
+    accelOverruns = 0;
+    accelLastPoll = millis();
+  }
+}
+
+/** Call from the step-test wait loop; feeds the pedometer every ACCEL_POLL_INTERVAL_MS. */
+void steps_service() {
+  if (accelChip != AccelChip::Lis2dh12 || millis() - accelLastPoll < ACCEL_POLL_INTERVAL_MS) return;
+  accelLastPoll = millis();
+  lis2dh12_drain_fifo([](int16_t x, int16_t y, int16_t z) { pedometerSteps += pedometer.update(x, y, z); });
+}
+
+uint32_t steps_now() {
+  if (accelChip == AccelChip::Lis2dh12) return pedometerSteps;
+  noInterrupts();
+  const uint32_t count = stepInterrupts;
+  interrupts();
+  return count;
+}
+
+void test_steps() {
+  report_running(T_STEPS);
+  const bool softwarePedometer = accelChip == AccelChip::Lis2dh12;
+  steps_reset();
+  // LIS2DS12 only: its hardware counter is read as a cross-check.
   uint8_t counter[2] = {0, 0};
-  const bool counterReadable = imu_read(0x3B, counter, 2);
+  const bool counterReadable = !softwarePedometer && imu_read(0x3B, counter, 2);
   const uint16_t counterStart = counter[0] | (counter[1] << 8);
 
   // Wait for the operator, so a board isn't failed just because nobody was at its slot.
@@ -833,36 +1085,69 @@ void test_steps() {
     return;
   }
   run.startRequested = false;
-  noInterrupts();
-  stepInterrupts = 0;
-  interrupts();
+  steps_reset();
 
-  char text[96];
-  snprintf(text, sizeof(text), "Walk with the board, or swing it like a step, %u times", STEP_TARGET * 2);
+  char text[128];
+  if (softwarePedometer) {
+    // The shoe pedometer counts one stride (two steps) per swing, and needs the
+    // board to rest briefly between swings, as a foot does in stance.
+    // One swing is one stride, two steps; round up so an odd target is still reached.
+    snprintf(text, sizeof(text),
+             "Walk with the board on a shoe, or swing it heel-to-toe at least %u times, pausing still between swings",
+             (unsigned)((STEP_TARGET + 1) / 2));
+  } else {
+    snprintf(text, sizeof(text), "Walk with the board, or swing it like a step, %u times", STEP_TARGET * 2);
+  }
   report_prompt(T_STEPS, text, STEP_WINDOW_MS);
 
   const uint32_t startedAt = millis();
   uint32_t lastProgress = 0;
   uint32_t lastCount = 0;
-  while (millis() - startedAt < STEP_WINDOW_MS && stepInterrupts < STEP_TARGET && !aborted()) {
-    if (stepInterrupts != lastCount || millis() - lastProgress >= 5000) {
-      lastCount = stepInterrupts;
+  uint32_t lastStrides = 0;
+  while (millis() - startedAt < STEP_WINDOW_MS && steps_now() < STEP_TARGET && !aborted()) {
+    steps_service();
+    const uint32_t count = steps_now();
+    // The pedometer commits nothing until its 4th stride, so show strides too:
+    // the operator sees each swing register before the step count jumps.
+    const uint32_t strides = softwarePedometer ? pedometer.stats().strides : 0;
+    if (count != lastCount || strides != lastStrides || millis() - lastProgress >= 5000) {
+      lastCount = count;
+      lastStrides = strides;
       lastProgress = millis();
-      snprintf(text, sizeof(text), "%lu/%u steps · %lu s left", (unsigned long)lastCount, STEP_TARGET,
-               (unsigned long)((STEP_WINDOW_MS - (millis() - startedAt)) / 1000));
+      const unsigned long secondsLeft = (unsigned long)((STEP_WINDOW_MS - (millis() - startedAt)) / 1000);
+      if (softwarePedometer) {
+        snprintf(text, sizeof(text), "%lu/%u steps · %lu swings seen · %lu s left", (unsigned long)lastCount,
+                 STEP_TARGET, (unsigned long)strides, secondsLeft);
+      } else {
+        snprintf(text, sizeof(text), "%lu/%u steps · %lu s left", (unsigned long)lastCount, STEP_TARGET, secondsLeft);
+      }
       report_progress(T_STEPS, text);
     }
     wait_ms(50);
   }
-  const uint32_t steps = stepInterrupts;
+  steps_service();
+  const uint32_t steps = steps_now();
+  const bool ok = steps >= STEP_TARGET;
+
+  if (softwarePedometer) {
+    const stepwhere::PedometerStats &stats = pedometer.stats();
+    result_line(T_STEPS, ok ? Outcome::Pass : Outcome::Fail, millis() - startedAt,
+                ok ? nullptr : "Too few steps from the shoe pedometer (swing heel-to-toe with pauses, or walk it on a shoe)")
+      .data().str("chip", "LIS2DH12").unum("steps", steps).unum("target", STEP_TARGET)
+      .unum("bursts", stats.bursts).unum("strides", stats.strides).unum("tooLong", stats.too_long)
+      .unum("tooWeak", stats.too_weak).unum("tooShort", stats.too_short).unum("tooClose", stats.too_close)
+      .unum("streakBreaks", stats.streak_breaks).unum("fifoOverruns", accelOverruns).end();
+    return;
+  }
+
   uint16_t counterDelta = 0;
   if (counterReadable && imu_read(0x3B, counter, 2)) {
     counterDelta = (uint16_t)((counter[0] | (counter[1] << 8)) - counterStart);
   }
-  const bool ok = steps >= STEP_TARGET;
   result_line(T_STEPS, ok ? Outcome::Pass : Outcome::Fail, millis() - startedAt,
               ok ? nullptr : "Too few step interrupts (INT2 PB4, or walk more steadily)")
-    .data().unum("steps", steps).unum("target", STEP_TARGET).unum("counterDelta", counterDelta).end();
+    .data().str("chip", "LIS2DS12").unum("steps", steps).unum("target", STEP_TARGET)
+    .unum("counterDelta", counterDelta).end();
 }
 
 void test_gps() {
@@ -952,6 +1237,7 @@ void run_tests(uint16_t requested) {
   const bool radios = selected(T_MODEM) || selected(T_GPS);
   if (selected(T_POWER)) test_power();
   if (selected(T_IMU)) test_imu();
+  if (selected(T_FLASH)) test_flash();
 
   const bool powerOk = !selected(T_POWER) || passed(T_POWER);
   if (radios && powerOk && !aborted()) power_cycle_radios();
@@ -1125,11 +1411,10 @@ void setup() {
   analogReadResolution(12);
   pinMode(BATTERY_ADC, INPUT_ANALOG);
 
-  pinMode(LIS2DS12_SA0, OUTPUT);
-  digitalWrite(LIS2DS12_SA0, HIGH);  // I2C address 0x1D
-  pinMode(LIS2DS12_INT2, INPUT_PULLUP);
+  pinMode(ACCEL_SA0, OUTPUT);
+  digitalWrite(ACCEL_SA0, HIGH);  // LIS2DH12 0x19, LIS2DS12 0x1D
+  // INT2 (PB4) is set up by lis2ds12_configure() once a LIS2DS12 is found.
   qaI2c.begin();
-  attachInterrupt(digitalPinToInterrupt(LIS2DS12_INT2), on_step_interrupt, FALLING);
 
   SerialDBG.begin(CONSOLE_BAUD);
   delay(200);

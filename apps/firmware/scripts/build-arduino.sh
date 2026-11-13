@@ -9,6 +9,8 @@ BUILD_ROOT="${APP_DIR}/.builds"
 VARIANT="${1:-main}"
 SKETCH_ROOT="${BUILD_ROOT}/sketch"
 EXTRA_DEFINES=""
+# STM32duino board part number. Variants that run on the Rev11 board override it.
+BOARD_PNUM="AGAFIA_SG0"
 case "${VARIANT}" in
   main)
     SKETCH_NAME="stepwhere"
@@ -58,6 +60,9 @@ case "${VARIANT}" in
     ARTIFACTS_DIR="${BUILD_ROOT}/artifacts/qa"
     EXPORT_DIR="${BUILD_ROOT}/output-qa"
     WORK_DIR="${BUILD_ROOT}/work-qa"
+    # Rev11 boards carry an STM32G070CBT6. Same target as the production firmware
+    # v2.2.0 (Smartshoe24/Stepwhere-Firmware main), which was tested on them.
+    BOARD_PNUM="GENERIC_G070CBTX"
     ;;
   *)
     echo "Unknown firmware variant: ${VARIANT} (expected main, capture, dev, accel-test, wifi-experiment-final, experiment-wifi or qa)." >&2
@@ -174,6 +179,9 @@ if [[ "${SKETCH_NAME}" == "stepwhere" || "${SKETCH_NAME}" == "stepwhere.dev" || 
   # Shared pure-logic headers and core build options (UART buffer sizes).
   cp -R "${APP_DIR}/src" "${SKETCH_DIR}/src"
   cp "${APP_DIR}/stepwhere.build_opt.h" "${SKETCH_DIR}/build_opt.h"
+elif [[ "${SKETCH_NAME}" == "stepwhere.qa" ]]; then
+  # The QA step test runs the same shoe pedometer as the main firmware.
+  cp -R "${APP_DIR}/src" "${SKETCH_DIR}/src"
 fi
 
 "${ARDUINO_CLI}" --config-file arduino-cli.yaml core update-index
@@ -193,7 +201,7 @@ fi
   --config-file arduino-cli.yaml \
   compile \
   --clean \
-  --fqbn STMicroelectronics:stm32:GenG0:pnum=AGAFIA_SG0 \
+  --fqbn "STMicroelectronics:stm32:GenG0:pnum=${BOARD_PNUM}" \
   --build-path "${WORK_DIR}" \
   --output-dir "${EXPORT_DIR}" \
   --build-property compiler.cpp.extra_flags="-DDEBUG_EN ${EXTRA_DEFINES}" \
