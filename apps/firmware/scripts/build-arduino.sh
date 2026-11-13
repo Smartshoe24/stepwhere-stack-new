@@ -174,6 +174,9 @@ if [[ "${SKETCH_NAME}" == "stepwhere" || "${SKETCH_NAME}" == "stepwhere.dev" || 
   # Shared pure-logic headers and core build options (UART buffer sizes).
   cp -R "${APP_DIR}/src" "${SKETCH_DIR}/src"
   cp "${APP_DIR}/stepwhere.build_opt.h" "${SKETCH_DIR}/build_opt.h"
+elif [[ "${SKETCH_NAME}" == "stepwhere.qa" ]]; then
+  # The QA step test runs the same shoe pedometer as the main firmware.
+  cp -R "${APP_DIR}/src" "${SKETCH_DIR}/src"
 fi
 
 "${ARDUINO_CLI}" --config-file arduino-cli.yaml core update-index

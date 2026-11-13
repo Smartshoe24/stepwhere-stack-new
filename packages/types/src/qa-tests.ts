@@ -30,14 +30,20 @@ export type QaBoardTestId = (typeof QA_BOARD_TEST_IDS)[number];
 
 export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description: string }> = {
   power: { label: "Battery", description: "Battery voltage is above the modem cut-off." },
-  imu: { label: "Accelerometer", description: "LIS2DS12 answers on I2C with WHO_AM_I 0x43 and reads motion." },
+  imu: {
+    label: "Accelerometer",
+    description: "LIS2DH12 (WHO_AM_I 0x33) or LIS2DS12 (0x43) answers on I2C and reads about 1 g at rest.",
+  },
   modem: { label: "Modem", description: "N706 answers AT after power-on." },
   sim: { label: "SIM", description: "SIM is ready; IMEI and ICCID are read." },
   gsm: { label: "GSM", description: "Registered on the network within the time limit from power-on." },
   wifi: { label: "Wi-Fi scan", description: "The modem's Wi-Fi scan sees at least one access point." },
   cell: { label: "Cell tower", description: "AT+NETDMSG returns a valid LTE serving cell." },
   data: { label: "Data link", description: "A data connection comes up with an IP address." },
-  steps: { label: "Step counter", description: "The step interrupt counts while the board is walked or shaken." },
+  steps: {
+    label: "Step counter",
+    description: "Steps count while the board is walked or swung: the shoe pedometer on a LIS2DH12, the step interrupt on a LIS2DS12.",
+  },
   gps: { label: "GPS", description: "NMEA arrives and a valid fix is found within the time limit from power-on." },
 };
 
