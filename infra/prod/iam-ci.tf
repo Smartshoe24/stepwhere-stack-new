@@ -13,10 +13,15 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Both subject forms: the repository uses immutable subjects (owner@id/repo@id),
+    # and the plain owner/name form keeps working if that setting is turned off.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
+        "repo:${var.github_repository_immutable}:ref:refs/heads/main",
+        "repo:${var.github_repository_immutable}:environment:production",
+        "repo:${var.github_repository_immutable}:environment:production-migrations",
         "repo:${var.github_repository}:ref:refs/heads/main",
         "repo:${var.github_repository}:environment:production",
         "repo:${var.github_repository}:environment:production-migrations",

@@ -75,7 +75,17 @@ variable "db_max_allocated_storage_gib" {
 variable "github_repository" {
   description = "owner/name of the repository whose workflows may deploy."
   type        = string
-  default     = "stepwhere/stepwhere-stack"
+  default     = "Smartshoe24/stepwhere-stack-new"
+}
+
+# GitHub puts the owner@id/repo@id form in the OIDC subject when the repository
+# has immutable subjects on, which this one has
+# (GET repos/<owner>/<repo>/actions/oidc/customization/sub -> sub_claim_prefix).
+# It survives a rename, and a new repository with the same name cannot deploy.
+variable "github_repository_immutable" {
+  description = "owner@id/repo@id of github_repository, as GitHub writes it in immutable OIDC subjects."
+  type        = string
+  default     = "Smartshoe24@166411271/stepwhere-stack-new@1454954451"
 }
 
 variable "ecr_repositories" {

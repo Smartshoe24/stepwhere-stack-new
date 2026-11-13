@@ -81,7 +81,7 @@ Before relying on EAS Workflows:
 5. Link this repository:
 
 ```text
-stepwhere/stepwhere-stack
+Smartshoe24/stepwhere-stack-new
 ```
 
 6. Confirm EAS can access repository contents.
