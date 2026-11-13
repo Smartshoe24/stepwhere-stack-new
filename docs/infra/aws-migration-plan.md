@@ -183,7 +183,7 @@ infra/
 | --- | --- |
 | `s3.tf` | `stepwhere-storage`, `stepwhere-backups` (section 4) |
 | `ecr.tf` | `stepwhere-server`, `stepwhere-admin`, `stepwhere-share-view`, `stepwhere-device-ingest-proxy`. Scan on push. Mutable tags (deploys re-point `main`; `sha-*` tags stay unique by convention). Lifecycle: untagged images expire after 7 days; keep the newest 30 `sha-*`. |
-| `iam-ci.tf` | Role `stepwhere-prod-github-deploy`. Trust: `repo:stepwhere/stepwhere-stack`, `ref:refs/heads/main` and the `production` / `production-migrations` environments. Allows: ECR push to the 4 repos; `ssm:SendCommand` with `AWS-RunShellScript` on instances tagged `Project=stepwhere, Env=prod`; `ssm:GetCommandInvocation`. |
+| `iam-ci.tf` | Role `stepwhere-prod-github-deploy`. Trust: `repo:Smartshoe24/stepwhere-stack-new` (and its immutable form `repo:Smartshoe24@166411271/stepwhere-stack-new@1454954451`), `ref:refs/heads/main` and the `production` / `production-migrations` environments. Allows: ECR push to the 4 repos; `ssm:SendCommand` with `AWS-RunShellScript` on instances tagged `Project=stepwhere, Env=prod`; `ssm:GetCommandInvocation`. |
 | `backups.tf` | Data Lifecycle Manager: daily snapshot of volumes tagged `Backup=daily`, keep 7. |
 | `alarms.tf` | → SNS: EC2 status checks; EC2 CPU > 80% for 15 min; RDS CPU > 80% for 15 min; RDS `FreeStorageSpace` < 10 GiB; RDS `FreeableMemory` < 512 MiB; RDS `DatabaseConnections` > 150. |
 | `health.tf` | Route 53 health checks (these work without a Route 53 zone) for `https://api.stepwhere.in/health`, `https://share.stepwhere.in/health` and `http://ingest.stepwhere.in/health` (needs a `/health` route on the proxy, or a TCP check on :80). Each has a CloudWatch alarm → SNS. About $0.75 per check per month. |

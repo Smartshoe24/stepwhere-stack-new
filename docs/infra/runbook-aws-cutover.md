@@ -57,7 +57,7 @@ ssh-add ~/.ssh/stepwhere_prod_ops
 - [ ] Create a new machine identity / token for the AWS host with **read access to `prod`**. Keep it for the vault in Phase 3.
 - [ ] Note the password inside the current `prod` `REDIS_URL`. The new host's Redis reuses it, so `REDIS_URL` never has to change.
 
-**GitHub (`stepwhere/stepwhere-stack`)**
+**GitHub (`Smartshoe24/stepwhere-stack-new`)**
 - [ ] Repository variable **`AWS_DEPLOY_ENABLED` = `false`**. This is the gate behind rule 2: while it is `false`, pushes to `main` only build and push images, and the `migrate` and `deploy` jobs are skipped. (GitHub Free can't put required reviewers on environments in a private repo.) The `production` and `production-migrations` environments are created automatically on first use.
 
 **DNS provider**
