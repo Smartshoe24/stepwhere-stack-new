@@ -551,7 +551,10 @@ still to come.) Build it with:
 pnpm --filter @stepwhere/firmware build:qa
 ```
 
-Artifacts land in `.builds/artifacts/qa/stepwhere.qa.ino.*`. On the Bench,
+The QA build targets **Generic G070CBTx** (`pnum=GENERIC_G070CBTX`): Rev11 boards
+carry an STM32G070CBT6, and this is the target the production firmware v2.2.0
+in `Smartshoe24/Stepwhere-Firmware` was tested with. Artifacts land in
+`.builds/artifacts/qa/stepwhere.qa.ino.*`. On the Bench,
 upload the BIN or HEX with channel **QA firmware**, open the serial console,
 then flash: the tests start as soon as the board boots and take up to about
 eight minutes, most of it waiting for a GPS fix.
