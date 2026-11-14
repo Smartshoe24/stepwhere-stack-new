@@ -30,18 +30,24 @@ export const QA_BOARD_TEST_IDS = [
 export type QaBoardTestId = (typeof QA_BOARD_TEST_IDS)[number];
 
 export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description: string }> = {
-  power: { label: "Battery", description: "Battery voltage is above the modem cut-off." },
+  power: {
+    label: "Battery",
+    description: "Battery 3.4–4.4 V and not a saturated reading, MCU supply (VDDA) 3.0–3.6 V, and a valid charger status (CHRG/STDBY).",
+  },
   imu: {
     label: "Accelerometer",
     description: "LIS2DH12 (WHO_AM_I 0x33) or LIS2DS12 (0x43) answers on I2C and reads about 1 g at rest.",
   },
   flash: {
     label: "Memory chip",
-    description: "The W25Q128 external flash answers with JEDEC ID EF 40 18. Read-only: nothing is erased or written.",
+    description: "The W25Q128 answers with JEDEC ID EF 40 18, and its reserved test sector (0xFFF000) erases, writes and reads back.",
   },
   modem: { label: "Modem", description: "N706 answers AT after power-on." },
   sim: { label: "SIM", description: "SIM is ready; IMEI and ICCID are read." },
-  gsm: { label: "GSM", description: "Registered on the network within the time limit from power-on." },
+  gsm: {
+    label: "GSM",
+    description: "Registered on the network within 60 s of power-on, with signal strength CSQ of at least 10.",
+  },
   wifi: { label: "Wi-Fi scan", description: "The modem's Wi-Fi scan sees at least one access point." },
   cell: { label: "Cell tower", description: "AT+NETDMSG returns a valid LTE serving cell." },
   data: { label: "Data link", description: "A data connection comes up with an IP address." },
@@ -49,7 +55,10 @@ export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description:
     label: "Step counter",
     description: "Steps count while the board is walked or swung: the shoe pedometer on a LIS2DH12, the step interrupt on a LIS2DS12.",
   },
-  gps: { label: "GPS", description: "NMEA arrives and a valid fix is found within the time limit from power-on." },
+  gps: {
+    label: "GPS",
+    description: "Valid NMEA arrives within 5 s of power-on. A fix and satellites in view are reported as information.",
+  },
 };
 
 /** Firmware status words, kept short for the UART. */

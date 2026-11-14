@@ -556,22 +556,22 @@ carry an STM32G070CBT6, and this is the target the production firmware v2.2.0
 in `Smartshoe24/Stepwhere-Firmware` was tested with. Artifacts land in
 `.builds/artifacts/qa/stepwhere.qa.ino.*`. On the Bench,
 upload the BIN or HEX with channel **QA firmware**, open the serial console,
-then flash: the tests start as soon as the board boots and take up to about
-eight minutes, most of it waiting for a GPS fix.
+then flash: the tests start as soon as the board boots and take about three
+minutes plus the time the operator takes for the step test.
 
 | Test | Pass when |
 |---|---|
-| `power` | Battery ≥ 3400 mV (the main firmware's modem cut-off) |
+| `power` | Battery 3400–4400 mV and the ADC not saturated (raw < 4090); VDDA 3.0–3.6 V from the factory VREFINT calibration; charger CHRG/STDBY (PB14/PB15) not both low |
 | `imu` | The accelerometer is found by `WHO_AM_I` (LIS2DH12 `0x33` at 0x19/0x18, or LIS2DS12 `0x43` at 0x1D/0x1E) and reads about 1 g at rest |
-| `flash` | The W25Q128 memory chip (IC8, SPI1, /CS PC6) answers `9Fh` with JEDEC ID `EF 40 18`. Read-only: nothing is erased or written |
+| `flash` | The W25Q128 memory chip (IC8, SPI1, /CS PC6) answers `9Fh` with JEDEC ID `EF 40 18`, then its reserved test sector `0xFFF000` (`EXT_SELFTEST_ADDR`, outside every OTA slot and the motion log) erases, takes one written page, reads it back and erases again. Nothing else is touched |
 | `modem` | N706 answers `AT` after the power key; IMEI read (also printed as `[IMEI] …`) |
 | `sim` | `AT+CPIN?` is `READY` within 15 s; ICCID read |
-| `gsm` | Registered on LTE (`AT+CEREG?` 1 or 5) within **15 s** of the power key |
+| `gsm` | Registered on LTE (`AT+CEREG?` 1 or 5) within **60 s** of the power key, and CSQ ≥ **10** |
 | `wifi` | `AT+WIFIAPSCAN` sees at least one access point |
 | `cell` | `AT+NETDMSG` parses as a valid LTE serving cell |
-| `data` | `AT+XIIC` brings up a data IP within 60 s of the power key |
+| `data` | `AT+XIIC` brings up a data IP within 60 s of the power key (APN `QA_APN`, default `internet`) |
 | `steps` | After **Start**, 10 steps within 60 s while the operator walks or swings the board: from the shoe pedometer (`src/pedometer.h`) on a LIS2DH12, or step interrupts on INT2 on a LIS2DS12 |
-| `gps` | NMEA within 5 s, then a fix with 4+ satellites within **7 min** of GPS power-on |
+| `gps` | Valid NMEA within 5 s of GPS power-on. A fix (4+ satellites), satellites in view and HDOP are **information only**: it looks for a fix until 3 min after power-on |
 
 Each run power-cycles the modem and GPS rail first, so the GSM and GPS clocks
 start from a real power-on. A test whose prerequisite failed is reported as
