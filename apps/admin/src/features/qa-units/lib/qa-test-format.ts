@@ -115,6 +115,13 @@ export function summarizeResult(result: QaTestResultDto): string | null {
       return ip ? `IP ${ip}` : null
     }
     case 'steps': {
+      // qa-0.6.0: the LIS2DH12 self-test reports how far each axis moved.
+      if (str(data, 'mode') === 'self-test') {
+        const dx = num(data, 'dxMg')
+        const dy = num(data, 'dyMg')
+        const dz = num(data, 'dzMg')
+        return dx != null && dy != null && dz != null ? `self-test X ${dx} · Y ${dy} · Z ${dz} mg` : 'self-test'
+      }
       const steps = num(data, 'steps')
       const target = num(data, 'target')
       // LIS2DH12 boards count with the shoe pedometer: one swing is one stride.

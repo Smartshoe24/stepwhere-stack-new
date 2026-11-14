@@ -575,7 +575,7 @@ minutes plus the time the operator takes for the step test.
 | `wifi` | `AT+WIFIAPSCAN` sees at least one access point |
 | `cell` | `AT+NETDMSG` parses as a valid LTE serving cell |
 | `data` | `AT+XIIC` brings up a data IP within 60 s of the power key (APN `QA_APN`, default `internet`) |
-| `steps` | After **Start**, 10 steps within 60 s while the operator walks or swings the board: from the shoe pedometer (`src/pedometer.h`) on a LIS2DH12, or step interrupts on INT2 on a LIS2DS12 |
+| `steps` | **Motion self-test** (default): the LIS2DH12's built-in self-test, so no one has to touch the board. Each axis must move 68–1440 mg (datasheet table 4: 17–360 digits at ±2 g normal mode). On a LIS2DS12, or with `-DQA_STEP_SWING_TEST=1`, the swing test runs instead: after **Start**, 10 steps within 60 s while the operator walks or swings the board |
 | `gps` | Valid NMEA within 5 s of GPS power-on. A fix (4+ satellites), satellites in view and HDOP are **information only**: it looks for a fix until 3 min after power-on |
 
 Each run power-cycles the modem and GPS rail first, so the GSM and GPS clocks
