@@ -77,6 +77,7 @@ import type {
   QaUnitsListQuery,
   SetQaUnitStageInput,
   UpdatePreviewAccessEntryInput,
+  UpdateQaStationAutomationInput,
   UpdateQaStationSlotsInput,
   UpdateQaUnitInput,
   VerifyOtpInput,
@@ -651,6 +652,13 @@ export function createQaStation(input: CreateQaStationInput) {
 export function renameQaStation(stationId: string, input: CreateQaStationInput) {
   return apiRequest<QaStationDto>(`/v1/admin/qa/stations/${stationId}`, {
     method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function setQaStationAutomation(stationId: string, input: UpdateQaStationAutomationInput) {
+  return apiRequest<QaStationDto>(`/v1/admin/qa/stations/${stationId}/automation`, {
+    method: 'PUT',
     body: JSON.stringify(input),
   })
 }

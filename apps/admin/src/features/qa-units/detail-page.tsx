@@ -312,6 +312,7 @@ export function QaUnitDetailPage() {
                     />
                   </KeyValueList>
                 </Panel>
+                <FunctionalChecksPanel unit={unit} />
                 <Panel title='Where it is'>
                   <KeyValueList>
                     <KeyValue label='Station' value={unit.lastStationName} />
@@ -632,5 +633,84 @@ function JobsTable({ jobs }: { jobs: QaBenchJobDto[] }) {
         )}
       </tbody>
     </EventTable>
+  )
+}
+
+/**
+ * Stage 2 evidence: what the production firmware has reported over GSM.
+ * Passes with one report, a step counter and any location (GPS, Wi-Fi or
+ * cell), because the firmware only sends Wi-Fi/cell when GPS has no fix.
+ */
+function FunctionalChecksPanel({ unit }: { unit: QaUnitDetailDto }) {
+  const checks = unit.functionalChecks
+  const reachedStage =
+    stageIndex(unit.stage) >= stageIndex('production_firmware')
+  if (!checks && !reachedStage) return null
+
+  const gsm = !!checks && checks.reports > 0
+  const steps = checks?.stepCounter != null
+  const sources = [
+    checks?.gpsFixAt ? 'GPS' : null,
+    checks?.wifiAt ? 'Wi-Fi' : null,
+    checks?.cellAt ? 'Cell' : null,
+  ].filter((s): s is string => !!s)
+  const passed = !!checks?.passedAt || (gsm && steps && sources.length > 0)
+
+  const row = (ok: boolean, detail: string) => (
+    <span className='flex items-center gap-2'>
+      <StatusBadge tone={ok ? 'success' : 'muted'}>
+        {ok ? 'Passed' : 'Waiting'}
+      </StatusBadge>
+      <span className='text-xs text-ink-3'>{detail}</span>
+    </span>
+  )
+
+  return (
+    <Panel
+      title='Functional tests'
+      actions={
+        passed ? <StatusBadge tone='success'>All green</StatusBadge> : null
+      }
+    >
+      <KeyValueList>
+        <KeyValue
+          label='GSM report'
+          value={row(
+            gsm,
+            checks
+              ? `${checks.reports} report${checks.reports === 1 ? '' : 's'}`
+              : 'No report yet'
+          )}
+        />
+        <KeyValue
+          label='Steps'
+          value={row(
+            steps,
+            steps ? `counter ${checks?.stepCounter}` : 'No step counter yet'
+          )}
+        />
+        <KeyValue
+          label='Location'
+          value={row(
+            sources.length > 0,
+            sources.length > 0 ? sources.join(', ') : 'No GPS, Wi-Fi or cell'
+          )}
+        />
+        <KeyValue
+          label='Battery'
+          value={
+            checks?.batteryVoltageMv != null
+              ? `${(checks.batteryVoltageMv / 1000).toFixed(2)} V`
+              : null
+          }
+        />
+        <KeyValue
+          label='Last report'
+          value={
+            checks ? <AdminLastSeen value={checks.lastReportAt} /> : null
+          }
+        />
+      </KeyValueList>
+    </Panel>
   )
 }

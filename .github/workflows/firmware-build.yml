@@ -4,14 +4,22 @@
 # - On a pull request that touches apps/firmware/, it builds the QA firmware
 #   and runs the firmware host tests, so every firmware change is compiled for
 #   the real target (STM32G070 for qa) before it is merged.
+# - On a push to main that touches apps/firmware/, it builds the QA firmware
+#   and, when the QA_CI_UPLOAD_TOKEN secret is set, uploads the .hex to the
+#   Bench as the newest QA firmware (QA channel only; production firmware is
+#   always uploaded by a person). Same file twice is skipped by the server.
 # - Actions -> Firmware Build -> Run workflow builds any variant on demand, from
 #   any branch. The files appear under "Artifacts" on the run's page.
 #
-# Build only: no credentials, nothing is deployed, flashed or published.
+# Pull requests and manual runs only build: no credentials are used.
 
 name: Firmware Build
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/firmware/**"
   pull_request:
     branches: [main]
     paths:
@@ -103,3 +111,32 @@ jobs:
           path: apps/firmware/.builds/artifacts/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload QA firmware to the Bench
+        if: github.event_name == 'push' && env.VARIANT == 'qa'
+        env:
+          QA_CI_UPLOAD_TOKEN: ${{ secrets.QA_CI_UPLOAD_TOKEN }}
+          QA_API_URL: ${{ vars.QA_API_URL || 'https://api.stepwhere.in' }}
+        run: |
+          if [[ -z "$QA_CI_UPLOAD_TOKEN" ]]; then
+            echo "QA_CI_UPLOAD_TOKEN secret is not set; skipping the Bench upload."
+            exit 0
+          fi
+          hex=".builds/artifacts/qa/stepwhere.qa.ino.hex"
+          [[ -f "$hex" ]] || hex="$(find .builds/artifacts -name 'stepwhere.qa.ino.hex' | head -n 1)"
+          [[ -f "$hex" ]] || { echo "::error::QA .hex not found"; exit 1; }
+          version="$(sed -nE 's/^#define QA_FW_VERSION "([^"]+)".*/\1/p' stepwhere.qa.ino | head -n 1)"
+          base64 -w0 "$hex" > .builds/hex.b64
+          jq -n --rawfile b64 .builds/hex.b64 --arg v "${version}+${GITHUB_SHA::7}" \
+            '{fileName: "stepwhere.qa.ino.hex", contentBase64: $b64, version: $v}' > .builds/upload.json
+          status="$(curl -sS -o .builds/upload-response.json -w '%{http_code}' \
+            -X POST "${QA_API_URL%/}/v1/qa/ci/firmware-uploads" \
+            -H "Authorization: Bearer ${QA_CI_UPLOAD_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data-binary @.builds/upload.json)"
+          echo "Bench upload HTTP ${status}"
+          case "$status" in
+            201) echo "Uploaded \`${version}\` to the Bench (QA channel)." >> "$GITHUB_STEP_SUMMARY" ;;
+            200) echo "This QA firmware was already on the Bench." >> "$GITHUB_STEP_SUMMARY" ;;
+            *) cat .builds/upload-response.json; echo "::error::Bench upload failed (HTTP ${status})"; exit 1 ;;
+          esac

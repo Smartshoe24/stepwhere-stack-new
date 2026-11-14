@@ -6,6 +6,7 @@ import { stepwhereApiBaseUrl } from '@/lib/api-client'
 import { useSessionQuery } from '@/features/auth/session'
 import { emitQaBenchEvent } from '@/features/qa-bench/lib/qa-bench-events'
 import { upsertQaJobInCache, upsertQaTestRunInCache } from '@/features/qa-bench/lib/qa-bench-cache'
+import { showQaAttention } from '@/features/qa-bench/lib/qa-attention'
 
 const MAX_RECONNECT_DELAY_MS = 30_000
 const HEARTBEAT_STALE_AFTER_MS = 45_000
@@ -207,6 +208,13 @@ export function useAdminRealtime() {
           void queryClient.invalidateQueries({
             queryKey: ['admin', 'qa', 'station-slots', event.data.stationId],
           })
+          if (event.data.reason === 'jobs') {
+            // Automation removed one of its own "is a board there?" checks.
+            void queryClient.invalidateQueries({ queryKey: ['admin', 'qa', 'jobs', event.data.stationId] })
+          }
+          break
+        case 'admin:qa.attention':
+          showQaAttention(event.data)
           break
         case 'admin:qa.job.changed':
           upsertQaJobInCache(queryClient, event.data.job)
