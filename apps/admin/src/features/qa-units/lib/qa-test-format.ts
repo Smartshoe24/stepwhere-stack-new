@@ -30,8 +30,18 @@ export function summarizeResult(result: QaTestResultDto): string | null {
 
   switch (result.id) {
     case 'power': {
+      // qa-0.5.0 adds VDDA and the charger state; older runs only report mv.
       const mv = num(data, 'mv')
-      return mv != null ? `${(mv / 1000).toFixed(2)} V` : null
+      const vdda = num(data, 'vddaMv')
+      const charger = str(data, 'charger')
+      if (mv == null) return null
+      return [
+        `${(mv / 1000).toFixed(2)} V`,
+        vdda != null && `VDDA ${(vdda / 1000).toFixed(2)} V`,
+        charger && `charger: ${charger}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'imu': {
       // qa-0.3.0 and later name the sensor it found; older runs only report WHO_AM_I.
@@ -50,9 +60,17 @@ export function summarizeResult(result: QaTestResultDto): string | null {
       const id = str(data, 'jedecId')
       const expected = str(data, 'expected')
       if (!id) return null
-      return id === expected || !expected
-        ? `ID ${spacedHex(id)}`
-        : `ID ${spacedHex(id)} · expected ${spacedHex(expected)}`
+      // qa-0.5.0 also writes and reads back the reserved test sector.
+      const write = str(data, 'writeTest')
+      return [
+        id === expected || !expected
+          ? `ID ${spacedHex(id)}`
+          : `ID ${spacedHex(id)} · expected ${spacedHex(expected)}`,
+        write === 'ok' && 'write test OK',
+        write === 'fail' && 'write test failed',
+      ]
+        .filter(Boolean)
+        .join(' · ')
     }
     case 'modem': {
       const imei = str(data, 'imei')
@@ -110,12 +128,16 @@ export function summarizeResult(result: QaTestResultDto): string | null {
         .join(' · ')
     }
     case 'gps': {
+      // From qa-0.5.0 a fix is information only: `fix` says whether one was found.
+      const fix = typeof data.fix === 'boolean' ? data.fix : null
       const fixMs = num(data, 'fixMs')
       const sats = num(data, 'satellites')
+      const inView = num(data, 'inView')
       const hdop = num(data, 'hdop')
       return [
-        fixMs != null ? `Fix in ${formatSeconds(fixMs)}` : null,
-        sats != null && `${sats} satellites`,
+        fixMs != null ? `Fix in ${formatSeconds(fixMs)}` : fix === true ? 'Fix' : fix === false ? 'NMEA OK, no fix (info)' : null,
+        inView != null && `${inView} in view`,
+        sats != null && (fix !== false || sats > 0) && `${sats} used`,
         hdop != null && `HDOP ${hdop}`,
       ]
         .filter(Boolean)

@@ -40,15 +40,27 @@
 
 #include "src/pedometer.h"
 
-#define QA_FW_VERSION "qa-0.4.0"
+#define QA_FW_VERSION "qa-0.5.0"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
 constexpr uint32_t BATTERY_MIN_MV = 3400;           // modem cut-off in stepwhere.ino
-constexpr uint32_t GSM_REGISTER_LIMIT_MS = 15000;   // power-on to network registration
+constexpr uint32_t BATTERY_MAX_MV = 4400;           // above a full Li-ion cell (4.2 V) plus margin
+constexpr uint16_t ADC_SATURATED_RAW = 4090;        // 12-bit ADC pinned at the top: not a real reading
+constexpr uint32_t VDDA_MIN_MV = 3000;              // MCU supply is 3.3 V
+constexpr uint32_t VDDA_MAX_MV = 3600;
+constexpr int32_t GSM_CSQ_MIN = 10;                 // the antenna is a wire; below 10 (−93 dBm) is a defect
+// Same APN as the production firmware v2.2.0. Change it here if the bench SIMs need another one
+// (Airtel IoT, for example, may use "airteliot.com"); or build with -DQA_APN=\"…\".
+#ifndef QA_APN
+#define QA_APN "internet"
+#endif
+constexpr uint32_t GSM_REGISTER_LIMIT_MS = 60000;   // power-on to network registration (spec v2;
+                                                    // a weak antenna is caught by GSM_CSQ_MIN)
 constexpr uint32_t GSM_REGISTER_GIVE_UP_MS = 60000; // keep measuring a late registration
 constexpr uint32_t DATA_LIMIT_MS = 60000;           // power-on to a data IP
-constexpr uint32_t GPS_FIX_LIMIT_MS = 7UL * 60UL * 1000UL;  // GPS power-on to a valid fix
+// GPS fix is information only (QA spec v2): look for one this long after GPS power-on.
+constexpr uint32_t GPS_FIX_INFO_LIMIT_MS = 3UL * 60UL * 1000UL;
 constexpr uint32_t GPS_NMEA_LIMIT_MS = 5000;        // first NMEA bytes after GPS power-on
 constexpr uint8_t GPS_MIN_SATELLITES = 4;           // stepwhere.ino requires more than 3
 constexpr uint32_t STEP_WINDOW_MS = 60000;
@@ -62,6 +74,13 @@ constexpr int32_t ACCEL_MAX_MG = 1300;
 #define GSM_PWRKEY PB13
 #define LDO_EN PA10
 #define BATTERY_ADC PB10
+#define CHARGER_CHRG PB14   // TP4056 CHRG, open-drain, low = charging
+#define CHARGER_STDBY PB15  // TP4056 STDBY, open-drain, low = charge complete
+constexpr uint32_t VREFINT_CAL_VDDA_MV = 3000;  // the factory VREFINT value is measured at 3.0 V
+#ifndef QA_READ_VREFINT_CAL
+// STM32G0 VREFINT_CAL: 16-bit word in system memory (RM0444, datasheet table "Internal voltage reference").
+#define QA_READ_VREFINT_CAL() (*(const volatile uint16_t *)0x1FFF75AAUL)
+#endif
 #define I2C_SDA PA12
 #define I2C_SCL PA11
 #define ACCEL_SA0 PA1
@@ -89,16 +108,29 @@ constexpr uint32_t ACCEL_POLL_INTERVAL_MS = 200;  // same as stepwhere.ino; the 
 
 // W25Q128 external flash (IC8). Same pins as the OTA flash driver. It sits on the
 // MCU supply (it answers with the modem/GPS rail off), so the test needs nothing first.
-#define FLASH_MOSI PA7
-#define FLASH_MISO PA6
-#define FLASH_SCK PA5
-#define FLASH_CS PC6
-#define FLASH_WP PC7     // driven high: low blocks status-register writes
-#define FLASH_HOLD PB12  // driven high: low pauses the chip and reads return 0xFF
-constexpr uint32_t FLASH_JEDEC_EXPECTED = 0xEF4018;  // Winbond (EF), W25Q128 (40 18)
-constexpr uint32_t FLASH_SPI_HZ = 4000000;
-constexpr uint8_t FLASH_CMD_RELEASE_PD = 0xAB;
-constexpr uint8_t FLASH_CMD_JEDEC_ID = 0x9F;
+#define W25Q_MOSI PA7
+#define W25Q_MISO PA6
+#define W25Q_SCK PA5
+#define W25Q_CS PC6
+#define W25Q_WP PC7     // driven high: low blocks status-register writes
+#define W25Q_HOLD PB12  // driven high: low pauses the chip and reads return 0xFF
+constexpr uint32_t W25Q_JEDEC_EXPECTED = 0xEF4018;  // Winbond (EF), W25Q128 (40 18)
+constexpr uint32_t W25Q_SPI_HZ = 4000000;
+constexpr uint8_t W25Q_CMD_RELEASE_PD = 0xAB;
+constexpr uint8_t W25Q_CMD_JEDEC_ID = 0x9F;
+constexpr uint8_t W25Q_CMD_WRITE_ENABLE = 0x06;
+constexpr uint8_t W25Q_CMD_READ_SR1 = 0x05;
+constexpr uint8_t W25Q_CMD_READ = 0x03;
+constexpr uint8_t W25Q_CMD_PAGE_PROGRAM = 0x02;
+constexpr uint8_t W25Q_CMD_SECTOR_ERASE = 0x20;
+constexpr uint8_t W25Q_SR1_BUSY = 0x01;
+constexpr uint16_t W25Q_PAGE_SIZE = 256;
+// The last 4 KB sector: EXT_SELFTEST_ADDR in the OTA layout (Smartshoe24/Stepwhere-Firmware,
+// libraries/StepwhereOTA/src/ota_layout.h), outside every OTA slot and the motion log.
+// The flash self-test uses the same sector, so a QA run never touches real data.
+constexpr uint32_t W25Q_TEST_ADDR = 0xFFF000;
+constexpr uint32_t W25Q_ERASE_TIMEOUT_MS = 1000;   // tSE max 400 ms
+constexpr uint32_t W25Q_PROGRAM_TIMEOUT_MS = 20;   // tPP max 3 ms
 
 constexpr uint32_t CONSOLE_BAUD = 115200;
 constexpr uint32_t GSM_BAUD = 115200;
@@ -115,8 +147,14 @@ HardwareSerial SerialGSM(PA3, PA2);
 HardwareSerial SerialGPS(PB9, PB8);
 HardwareSerial SerialDBG(PB7, PB6);
 TwoWire qaI2c(I2C_SDA, I2C_SCL);
-SPIClass flashSpi(FLASH_MOSI, FLASH_MISO, FLASH_SCK);
+SPIClass flashSpi(W25Q_MOSI, W25Q_MISO, W25Q_SCK);
 TinyGPSPlus gps;
+// GSV field 3 is "satellites in view" for each constellation's talker.
+TinyGPSCustom gsvGps(gps, "GPGSV", 3);
+TinyGPSCustom gsvGlonass(gps, "GLGSV", 3);
+TinyGPSCustom gsvGalileo(gps, "GAGSV", 3);
+TinyGPSCustom gsvBeidou(gps, "BDGSV", 3);
+TinyGPSCustom gsvBeidouGb(gps, "GBGSV", 3);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 // Same order as QA_BOARD_TEST_IDS in packages/types/src/qa-tests.ts.
@@ -172,6 +210,17 @@ struct ServingCell {
   int16_t rsrpTenthsDbm = 0;
   char duplex[4] = "";
 };
+
+// Types used in function signatures must be declared before the first function:
+// the Arduino builder inserts its generated prototypes there.
+struct BatteryReading {
+  uint32_t mv = 0;       // battery voltage after the 1:2 divider
+  uint16_t raw = 0;      // PB10, 12-bit, averaged
+  uint32_t vddaMv = 0;   // MCU analog supply, from VREFINT
+  bool factoryCal = false;
+};
+
+enum class ChargeState : uint8_t { Idle, Charging, Complete, Invalid };
 
 char chipUid[25] = "";
 volatile uint32_t stepInterrupts = 0;
@@ -342,13 +391,55 @@ void wait_ms(uint32_t durationMs) {
 
 // ─── Power ────────────────────────────────────────────────────────────────────
 
+/** The G0's factory VREFINT reading, taken at VDDA = 3.0 V. 0 if it looks unprogrammed. */
+uint16_t vrefint_factory_cal() {
+  const uint16_t cal = QA_READ_VREFINT_CAL();
+  return (cal > 1000 && cal < 2400) ? cal : 0;  // about 1650 on a real part
+}
+
+/**
+ * Battery and VDDA, averaged over 16 readings. VDDA comes from the factory
+ * VREFINT calibration when it is programmed, else from the nominal 1212 mV
+ * the main firmware uses. Same 1:2 divider as the main firmware.
+ */
+BatteryReading read_battery() {
+  BatteryReading r;
+  uint32_t vrefSum = 0, batterySum = 0;
+  for (uint8_t i = 0; i < 16; i++) {
+    vrefSum += analogRead(AVREF);
+    batterySum += analogRead(BATTERY_ADC);
+  }
+  const uint32_t vrefRaw = vrefSum / 16;
+  r.raw = (uint16_t)(batterySum / 16);
+  if (vrefRaw == 0) return r;
+  const uint16_t cal = vrefint_factory_cal();
+  r.factoryCal = cal != 0;
+  r.vddaMv = r.factoryCal ? (VREFINT_CAL_VDDA_MV * cal) / vrefRaw : (VREF_CAL_MV * ADC_MAX) / vrefRaw;
+  r.mv = (2UL * r.raw * r.vddaMv) / ADC_MAX;
+  return r;
+}
+
 uint32_t battery_mv() {
-  const uint16_t vrefRaw = analogRead(AVREF);
-  const uint16_t batteryRaw = analogRead(BATTERY_ADC);
-  if (vrefRaw == 0) return 0;
-  // Same Vref calibration and 2:1 divider as the main firmware.
-  const uint32_t vddaMv = (VREF_CAL_MV * ADC_MAX) / vrefRaw;
-  return (2UL * batteryRaw * vddaMv) / ADC_MAX;
+  return read_battery().mv;
+}
+
+/** TP4056 CHRG / STDBY, open-drain and active low (as stepwhere.ino reads them). */
+ChargeState read_charge_state(bool &chrgLow, bool &stdbyLow) {
+  chrgLow = digitalRead(CHARGER_CHRG) == LOW;
+  stdbyLow = digitalRead(CHARGER_STDBY) == LOW;
+  if (chrgLow && !stdbyLow) return ChargeState::Charging;
+  if (!chrgLow && stdbyLow) return ChargeState::Complete;
+  if (!chrgLow && !stdbyLow) return ChargeState::Idle;
+  return ChargeState::Invalid;
+}
+
+const char *charge_state_name(ChargeState state) {
+  switch (state) {
+    case ChargeState::Charging: return "charging";
+    case ChargeState::Complete: return "charge complete";
+    case ChargeState::Idle: return "not charging";
+    default: return "invalid";
+  }
 }
 
 /** Cuts the rail, then powers the GPS and modem the way stepwhere.ino does. Times both. */
@@ -709,10 +800,24 @@ bool aborted() {
 
 void test_power() {
   report_running(T_POWER);
-  const uint32_t mv = battery_mv();
-  const bool ok = mv >= BATTERY_MIN_MV;
-  result_line(T_POWER, ok ? Outcome::Pass : Outcome::Fail, 0, ok ? nullptr : "Battery below the modem cut-off; charge it")
-    .data().unum("mv", mv).unum("minMv", BATTERY_MIN_MV).end();
+  const BatteryReading b = read_battery();
+  bool chrgLow = false, stdbyLow = false;
+  const ChargeState charge = read_charge_state(chrgLow, stdbyLow);
+
+  // A saturated or impossibly high reading is a broken divider or ADC input,
+  // not a full battery: it would otherwise pass the minimum check.
+  const char *error = nullptr;
+  if (b.vddaMv == 0) error = "VREFINT read 0; the ADC is not working";
+  else if (b.raw >= ADC_SATURATED_RAW) error = "Battery ADC saturated (PB10 divider open, or the input is too high)";
+  else if (b.mv > BATTERY_MAX_MV) error = "Battery reads above 4.4 V (check the 1:2 divider on PB10)";
+  else if (b.mv < BATTERY_MIN_MV) error = "Battery below the modem cut-off; charge it";
+  else if (b.vddaMv < VDDA_MIN_MV || b.vddaMv > VDDA_MAX_MV) error = "MCU supply (VDDA) out of range; check the 3.3 V regulator";
+  else if (charge == ChargeState::Invalid) error = "Charger CHRG (PB14) and STDBY (PB15) both low; check the charger IC";
+
+  result_line(T_POWER, error ? Outcome::Fail : Outcome::Pass, 0, error)
+    .data().unum("mv", b.mv).unum("minMv", BATTERY_MIN_MV).unum("maxMv", BATTERY_MAX_MV)
+    .unum("raw", b.raw).unum("vddaMv", b.vddaMv).flag("factoryCal", b.factoryCal)
+    .str("charger", charge_state_name(charge)).flag("chrgLow", chrgLow).flag("stdbyLow", stdbyLow).end();
 }
 
 void test_imu() {
@@ -786,50 +891,159 @@ void test_imu() {
 
 /** One SPI command to the flash: sends `command`, then clocks out `count` bytes into `out`. */
 void flash_command(uint8_t command, uint8_t *out, uint8_t count) {
-  flashSpi.beginTransaction(SPISettings(FLASH_SPI_HZ, MSBFIRST, SPI_MODE0));
-  digitalWrite(FLASH_CS, LOW);
+  flashSpi.beginTransaction(SPISettings(W25Q_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(W25Q_CS, LOW);
   flashSpi.transfer(command);
   for (uint8_t i = 0; i < count; i++) out[i] = flashSpi.transfer(0x00);
-  digitalWrite(FLASH_CS, HIGH);
+  digitalWrite(W25Q_CS, HIGH);
   flashSpi.endTransaction();
 }
 
-/** Reads the W25Q128's JEDEC ID. Read-only: the chip is never erased or written. */
+/** A command with a 24-bit address, then `count` bytes clocked in (`in`) or out (`out`). */
+void flash_command_addr(uint8_t command, uint32_t address, const uint8_t *out, uint8_t *in, uint16_t count) {
+  flashSpi.beginTransaction(SPISettings(W25Q_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(W25Q_CS, LOW);
+  flashSpi.transfer(command);
+  flashSpi.transfer((uint8_t)(address >> 16));
+  flashSpi.transfer((uint8_t)(address >> 8));
+  flashSpi.transfer((uint8_t)address);
+  for (uint16_t i = 0; i < count; i++) {
+    const uint8_t got = flashSpi.transfer(out ? out[i] : 0x00);
+    if (in) in[i] = got;
+  }
+  digitalWrite(W25Q_CS, HIGH);
+  flashSpi.endTransaction();
+}
+
+uint8_t flash_status() {
+  uint8_t sr1 = 0xFF;
+  flash_command(W25Q_CMD_READ_SR1, &sr1, 1);
+  return sr1;
+}
+
+/** Waits for BUSY to clear. Returns false on timeout. */
+bool flash_wait_ready(uint32_t timeoutMs) {
+  const uint32_t startedAt = millis();
+  while (flash_status() & W25Q_SR1_BUSY) {
+    if (millis() - startedAt > timeoutMs) return false;
+    delay(1);
+  }
+  return true;
+}
+
+/** True if `count` bytes at `address` equal `expected` (or are all 0xFF when it is null). */
+bool flash_verify(uint32_t address, const uint8_t *expected, uint16_t count, uint16_t &firstBad) {
+  uint8_t buffer[W25Q_PAGE_SIZE];
+  flash_command_addr(W25Q_CMD_READ, address, nullptr, buffer, count);
+  for (uint16_t i = 0; i < count; i++) {
+    if (buffer[i] != (expected ? expected[i] : 0xFF)) {
+      firstBad = i;
+      return false;
+    }
+  }
+  return true;
+}
+
+bool flash_erase_test_sector(uint32_t &eraseMs) {
+  flash_command(W25Q_CMD_WRITE_ENABLE, nullptr, 0);
+  const uint32_t startedAt = millis();
+  flash_command_addr(W25Q_CMD_SECTOR_ERASE, W25Q_TEST_ADDR, nullptr, nullptr, 0);
+  const bool ok = flash_wait_ready(W25Q_ERASE_TIMEOUT_MS);
+  eraseMs = millis() - startedAt;
+  return ok;
+}
+
+/**
+ * Erases, writes and reads back one page of the sector reserved for tests
+ * (EXT_SELFTEST_ADDR in the OTA layout: outside every OTA slot and the motion
+ * log), then erases it again. Returns null on success or the reason it failed.
+ */
+const char *flash_write_test(uint32_t &eraseMs, uint32_t &programMs) {
+  uint16_t bad = 0;
+  if (!flash_erase_test_sector(eraseMs)) return "Erase timed out (BUSY never cleared)";
+  if (!flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, bad)) {
+    return "Erase did not take (write-protected, /WP PC7 low, or SR1 protect bits set)";
+  }
+
+  uint8_t pattern[W25Q_PAGE_SIZE];
+  for (uint16_t i = 0; i < W25Q_PAGE_SIZE; i++) pattern[i] = (uint8_t)(i ^ 0xA5);
+  flash_command(W25Q_CMD_WRITE_ENABLE, nullptr, 0);
+  const uint32_t startedAt = millis();
+  flash_command_addr(W25Q_CMD_PAGE_PROGRAM, W25Q_TEST_ADDR, pattern, nullptr, W25Q_PAGE_SIZE);
+  const bool programmed = flash_wait_ready(W25Q_PROGRAM_TIMEOUT_MS);
+  programMs = millis() - startedAt;
+  if (!programmed) return "Page program timed out (BUSY never cleared)";
+  if (!flash_verify(W25Q_TEST_ADDR, pattern, W25Q_PAGE_SIZE, bad)) {
+    uint16_t unused = 0;
+    const bool stillErased = flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, unused);
+    uint32_t cleanupMs = 0;
+    flash_erase_test_sector(cleanupMs);  // best effort: leave the test sector clean
+    return stillErased ? "Nothing was written (write-protected: /WP PC7 low, or SR1 protect bits set)"
+                       : "Read-back differs from what was written (MOSI PA7, or a weak cell)";
+  }
+
+  uint32_t cleanupMs = 0;
+  if (!flash_erase_test_sector(cleanupMs) || !flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, bad)) {
+    return "Second erase failed";
+  }
+  return nullptr;
+}
+
+/**
+ * Reads the W25Q128's JEDEC ID, then writes and reads back the reserved test
+ * sector. Nothing outside that one 4 KB sector is ever erased or written.
+ */
 void test_flash() {
   report_running(T_FLASH);
   const uint32_t startedAt = millis();
-  pinMode(FLASH_CS, OUTPUT);
-  digitalWrite(FLASH_CS, HIGH);
-  pinMode(FLASH_WP, OUTPUT);
-  digitalWrite(FLASH_WP, HIGH);
-  pinMode(FLASH_HOLD, OUTPUT);
-  digitalWrite(FLASH_HOLD, HIGH);
+  pinMode(W25Q_CS, OUTPUT);
+  digitalWrite(W25Q_CS, HIGH);
+  pinMode(W25Q_WP, OUTPUT);
+  digitalWrite(W25Q_WP, HIGH);
+  pinMode(W25Q_HOLD, OUTPUT);
+  digitalWrite(W25Q_HOLD, HIGH);
   flashSpi.begin();
   delay(1);
 
   // The chip may have been left in deep power-down; it ignores 9Fh until released.
-  flash_command(FLASH_CMD_RELEASE_PD, nullptr, 0);
+  flash_command(W25Q_CMD_RELEASE_PD, nullptr, 0);
   delayMicroseconds(50);  // tRES1 is 3 µs
   uint8_t id[3] = {0, 0, 0};
-  flash_command(FLASH_CMD_JEDEC_ID, id, 3);
-  flashSpi.end();
+  flash_command(W25Q_CMD_JEDEC_ID, id, 3);
 
   const uint32_t jedec = ((uint32_t)id[0] << 16) | ((uint32_t)id[1] << 8) | id[2];
   char idHex[7];
   snprintf(idHex, sizeof(idHex), "%02X%02X%02X", id[0], id[1], id[2]);
   char expectedHex[7];
-  snprintf(expectedHex, sizeof(expectedHex), "%06lX", (unsigned long)FLASH_JEDEC_EXPECTED);
+  snprintf(expectedHex, sizeof(expectedHex), "%06lX", (unsigned long)W25Q_JEDEC_EXPECTED);
 
   const char *error = nullptr;
-  if (jedec == FLASH_JEDEC_EXPECTED) {
+  if (jedec == W25Q_JEDEC_EXPECTED) {
     // pass
   } else if (jedec == 0xFFFFFF) error = "No answer from the memory chip (MISO PA6 open, /CS PC6, /HOLD PB12 or its supply)";
   else if (jedec == 0x000000) error = "Memory chip ID reads 00 00 00 (MISO PA6 stuck low, or the chip has no supply)";
   else if (id[0] == 0xEF) error = "Winbond chip, but its ID is not EF 40 18 (a different part than the BOM's W25Q128)";
   else error = "Unexpected memory chip ID (wrong part, or bad solder on IC8)";
 
-  result_line(T_FLASH, error ? Outcome::Fail : Outcome::Pass, millis() - startedAt, error)
-    .data().str("jedecId", idHex).str("expected", expectedHex).end();
+  // Production writes this chip for OTA updates, so an ID alone is not enough.
+  uint32_t eraseMs = 0, programMs = 0;
+  const bool idOk = error == nullptr;
+  if (idOk) error = flash_write_test(eraseMs, programMs);
+  const uint8_t sr1 = flash_status();
+  flashSpi.end();
+
+  char sr1Hex[5];
+  snprintf(sr1Hex, sizeof(sr1Hex), "0x%02X", sr1);
+  char testAddrHex[7];
+  snprintf(testAddrHex, sizeof(testAddrHex), "%06lX", (unsigned long)W25Q_TEST_ADDR);
+
+  QaLine line = result_line(T_FLASH, error ? Outcome::Fail : Outcome::Pass, millis() - startedAt, error);
+  line.data().str("jedecId", idHex).str("expected", expectedHex);
+  if (idOk) {
+    line.str("writeTest", error ? "fail" : "ok").str("testAddr", testAddrHex).unum("eraseMs", eraseMs)
+      .unum("programMs", programMs).str("sr1", sr1Hex);
+  }
+  line.end();
 }
 
 void test_modem() {
@@ -844,7 +1058,7 @@ void test_modem() {
   }
   const uint32_t readyMs = millis() - run.pwrkeyAt;
   if (!run.modemReady) {
-    result_line(T_MODEM, Outcome::Fail, readyMs, "Modem does not answer AT (check LDO, PWRKEY PB13, UART PA2/PA3)").end();
+    result_line(T_MODEM, Outcome::Fail, readyMs, "Modem does not answer AT (check level shifter IC1 VCCB 3.3 V, LDO PA10, PWRKEY PB13, UART PA2/PA3)").end();
     return;
   }
   at("ATE0", AT_TIMEOUT_MS);
@@ -933,15 +1147,20 @@ void test_gsm() {
   }
 
   if (!run.registered) {
-    result_line(T_GSM, Outcome::Fail, registerMs, "Not registered on the network within 60 s (antenna, SIM or coverage)")
+    result_line(T_GSM, Outcome::Fail, registerMs, "Not registered on the network within the limit (antenna, SIM or coverage)")
       .data().unum("limitMs", GSM_REGISTER_LIMIT_MS).end();
     return;
   }
   const bool inTime = registerMs <= GSM_REGISTER_LIMIT_MS;
-  QaLine line = result_line(T_GSM, inTime ? Outcome::Pass : Outcome::Fail, registerMs,
-                            inTime ? nullptr : "Registered, but slower than the limit");
-  line.data().unum("registerMs", registerMs).unum("limitMs", GSM_REGISTER_LIMIT_MS);
-  if (csq >= 0 && csq != 99) line.num("csq", csq).num("rssiDbm", -113 + 2 * csq);
+  const bool signalKnown = csq >= 0 && csq != 99;
+  const bool signalOk = signalKnown && csq >= GSM_CSQ_MIN;
+  const char *error = nullptr;
+  if (!inTime) error = "Registered, but slower than the limit";
+  else if (!signalKnown) error = "Registered, but signal strength unknown (CSQ 99); check the antenna wire";
+  else if (!signalOk) error = "Signal too weak (CSQ below 10); check the antenna wire and its solder joint";
+  QaLine line = result_line(T_GSM, error ? Outcome::Fail : Outcome::Pass, registerMs, error);
+  line.data().unum("registerMs", registerMs).unum("limitMs", GSM_REGISTER_LIMIT_MS).num("csqMin", GSM_CSQ_MIN);
+  if (signalKnown) line.num("csq", csq).num("rssiDbm", -113 + 2 * csq);
   line.end();
 }
 
@@ -1014,7 +1233,7 @@ void test_data() {
   report_running(T_DATA);
   char reply[AT_REPLY_CAPACITY];
   char ip[40] = "";
-  at("AT+CGDCONT=1,\"IP\",\"internet\"", AT_TIMEOUT_MS);
+  at("AT+CGDCONT=1,\"IP\",\"" QA_APN "\"", AT_TIMEOUT_MS);
   at("AT+XIIC=0", AT_TIMEOUT_MS);
   at("AT+XIIC=1", XIIC_TIMEOUT_MS);
   while (millis() - run.pwrkeyAt < DATA_LIMIT_MS && !aborted()) {
@@ -1024,8 +1243,8 @@ void test_data() {
   }
   const uint32_t ms = millis() - run.pwrkeyAt;
   const bool ok = ip[0] != '\0';
-  result_line(T_DATA, ok ? Outcome::Pass : Outcome::Fail, ms, ok ? nullptr : "No data IP (APN \"internet\", SIM data plan, coverage)")
-    .data().str("ip", ok ? ip : nullptr).unum("limitMs", DATA_LIMIT_MS).end();
+  result_line(T_DATA, ok ? Outcome::Pass : Outcome::Fail, ms, ok ? nullptr : "No data IP (APN \"" QA_APN "\", SIM data plan, coverage)")
+    .data().str("ip", ok ? ip : nullptr).unum("limitMs", DATA_LIMIT_MS).str("apn", QA_APN).end();
 }
 
 // Step counting for the step test: INT2 pulses on a LIS2DS12, the shoe
@@ -1150,47 +1369,82 @@ void test_steps() {
     .unum("counterDelta", counterDelta).end();
 }
 
+/** Satellites in view, summed over every constellation's GSV "total in view" field. */
+uint32_t gps_satellites_in_view() {
+  TinyGPSCustom *const views[] = {&gsvGps, &gsvGlonass, &gsvGalileo, &gsvBeidou, &gsvBeidouGb};
+  uint32_t total = 0;
+  for (TinyGPSCustom *view : views) {
+    if (view->isValid()) total += (uint32_t)atoi(view->value());
+  }
+  return total;
+}
+
+/**
+ * GPS (QA spec v2, as approved): the module must talk, i.e. send NMEA with
+ * valid checksums. A fix is information: the bench is often indoors, so a
+ * missing fix never fails a board. Satellites in view are reported so a dead
+ * antenna still shows up. Location is checked again in the functional tests.
+ */
 void test_gps() {
   report_running(T_GPS);
   const uint32_t nmeaDeadline = run.ldoOnAt + GPS_NMEA_LIMIT_MS;
-  while ((int32_t)(millis() - nmeaDeadline) < 0 && gps.charsProcessed() == 0) wait_ms(50);
-  if (gps.charsProcessed() == 0) {
-    result_line(T_GPS, Outcome::Fail, millis() - run.ldoOnAt, "No NMEA from the GPS (check its power and UART PB8/PB9)")
-      .data().unum("limitMs", GPS_FIX_LIMIT_MS).end();
+  while ((int32_t)(millis() - nmeaDeadline) < 0 && gps.passedChecksum() == 0) wait_ms(50);
+  if (gps.passedChecksum() == 0) {
+    const char *error = gps.charsProcessed() == 0
+        ? "No NMEA from the GPS (check its power and UART PB8/PB9)"
+        : "GPS sends bytes but no valid NMEA (wrong baud rate, or noise on PB9)";
+    result_line(T_GPS, Outcome::Fail, millis() - run.ldoOnAt, error)
+      .data().unum("limitMs", GPS_NMEA_LIMIT_MS).unum("nmeaChars", gps.charsProcessed())
+      .unum("badChecksums", gps.failedChecksum()).end();
     return;
   }
 
-  report_prompt(T_GPS, "Keep the board near a window or outdoors until the GPS has a fix", GPS_FIX_LIMIT_MS);
-  uint32_t lastProgress = 0;
-  bool fixed = false;
-  while (millis() - run.ldoOnAt < GPS_FIX_LIMIT_MS && !aborted()) {
+  // Keep looking for a fix for a while; it is reported but does not decide the result.
+  report_prompt(T_GPS, "GPS is working. Near a window it may also get a fix (shown as information)", GPS_FIX_INFO_LIMIT_MS);
+  auto hasFix = []() {
     const uint32_t satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
-    if (gps.location.isValid() && gps.location.age() < 2000 && satellites >= GPS_MIN_SATELLITES) {
+    return gps.location.isValid() && gps.location.age() < 2000 && satellites >= GPS_MIN_SATELLITES;
+  };
+  uint32_t lastProgress = 0;
+  // The step test before this one can take minutes, so the window may already be
+  // over: always look once, so a board that already has a fix reports it.
+  bool fixed = hasFix();
+  const bool fixedBeforeWindow = fixed;
+  while (!fixed && millis() - run.ldoOnAt < GPS_FIX_INFO_LIMIT_MS && !aborted()) {
+    const uint32_t satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
+    if (hasFix()) {
       fixed = true;
       break;
     }
     if (millis() - lastProgress >= 5000) {
       lastProgress = millis();
-      char text[64];
+      char text[80];
       const uint32_t elapsed = (millis() - run.ldoOnAt) / 1000;
-      snprintf(text, sizeof(text), "Waiting for fix · %lu satellites · %lu:%02lu", (unsigned long)satellites,
+      snprintf(text, sizeof(text), "Looking for a fix · %lu in view · %lu used · %lu:%02lu",
+               (unsigned long)gps_satellites_in_view(), (unsigned long)satellites,
                (unsigned long)(elapsed / 60), (unsigned long)(elapsed % 60));
       report_progress(T_GPS, text);
     }
     wait_ms(100);
   }
-  const uint32_t fixMs = millis() - run.ldoOnAt;
-  if (!fixed) {
-    result_line(T_GPS, Outcome::Fail, fixMs, aborted() ? "Aborted" : "No valid fix within 7 min (antenna or sky view)")
-      .data().unum("limitMs", GPS_FIX_LIMIT_MS)
-      .unum("satellites", gps.satellites.isValid() ? gps.satellites.value() : 0)
-      .unum("nmeaChars", gps.charsProcessed()).unum("badChecksums", gps.failedChecksum()).end();
+  const uint32_t ms = millis() - run.ldoOnAt;
+  if (aborted() && !fixed) {
+    result_line(T_GPS, Outcome::Skip, ms, "Aborted").end();
     return;
   }
-  QaLine line = result_line(T_GPS, Outcome::Pass, fixMs);
-  line.data().unum("fixMs", fixMs).unum("limitMs", GPS_FIX_LIMIT_MS).unum("satellites", gps.satellites.value());
-  if (gps.hdop.isValid()) line.dec("hdop", gps.hdop.hdop(), 1);
-  line.dec("lat", gps.location.lat(), 5).dec("lng", gps.location.lng(), 5).end();
+  QaLine line = result_line(T_GPS, Outcome::Pass, ms);
+  line.data().flag("fix", fixed).unum("inView", gps_satellites_in_view())
+    .unum("satellites", gps.satellites.isValid() ? gps.satellites.value() : 0)
+    .unum("fixInfoLimitMs", GPS_FIX_INFO_LIMIT_MS).unum("nmeaOk", gps.passedChecksum())
+    .unum("badChecksums", gps.failedChecksum());
+  if (fixed) {
+    // Time to first fix only when it was measured here; a fix found at the first look
+    // happened earlier, during the step test.
+    if (!fixedBeforeWindow) line.unum("fixMs", ms);
+    if (gps.hdop.isValid()) line.dec("hdop", gps.hdop.hdop(), 1);
+    line.dec("lat", gps.location.lat(), 5).dec("lng", gps.location.lng(), 5);
+  }
+  line.end();
 }
 
 // ─── Run ──────────────────────────────────────────────────────────────────────
@@ -1410,6 +1664,8 @@ void setup() {
   digitalWrite(LDO_EN, LOW);
   analogReadResolution(12);
   pinMode(BATTERY_ADC, INPUT_ANALOG);
+  pinMode(CHARGER_CHRG, INPUT_PULLUP);   // as stepwhere.ino
+  pinMode(CHARGER_STDBY, INPUT_PULLUP);
 
   pinMode(ACCEL_SA0, OUTPUT);
   digitalWrite(ACCEL_SA0, HIGH);  // LIS2DH12 0x19, LIS2DS12 0x1D
