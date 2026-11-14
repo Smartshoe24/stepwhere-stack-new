@@ -47,6 +47,14 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=stepwhere:nodejs /app/node_modules /app/node_modules
 COPY --from=builder --chown=stepwhere:nodejs /app/apps/device-ingest-proxy/package.json /app/apps/device-ingest-proxy/package.json
 COPY --from=builder --chown=stepwhere:nodejs /app/apps/device-ingest-proxy/dist /app/apps/device-ingest-proxy/dist
+# OTA releases served under /fw. They come from the firmware S3 bucket behind
+# CloudFront, published by Smartshoe24/Stepwhere-Firmware release.yml on v*
+# tags; the proxy re-encodes image ranges as hex for the N706B (?enc=hex).
+# Set in the image because the host compose file is managed by Ansible.
+# FIRMWARE_UPSTREAM_URL="" in the compose environment falls back to the
+# bundled files below.
+ENV FIRMWARE_UPSTREAM_URL=https://d1e6333g4g5fxj.cloudfront.net
+COPY --from=builder --chown=stepwhere:nodejs /app/apps/device-ingest-proxy/firmware /srv/firmware
 
 USER stepwhere
 

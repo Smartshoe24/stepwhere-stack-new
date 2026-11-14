@@ -126,6 +126,19 @@ export type AdminDeviceDto = {
   updatedAt: string;
   activeBinding: AdminDeviceBindingDto | null;
   reservation: AdminDeviceReservationDto;
+  /** Last OTA status the tracker reported, null if it never sent one. */
+  firmware: AdminDeviceFirmwareDto | null;
+};
+
+export type AdminDeviceFirmwareDto = {
+  version: string;
+  bootloaderVersion: string | null;
+  signingKey: string | null;
+  otaState: string | null;
+  lastResult: string | null;
+  availableVersion: string | null;
+  downloadPercent: number | null;
+  reportedAt: string;
 };
 
 export type AdminDeviceTelemetryReliabilityDto = {

@@ -16,6 +16,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { FirmwareStatusInput } from "@stepwhere/types";
+
 import { accounts, sessions, users } from "./auth";
 import { organizations } from "./family";
 
@@ -100,6 +102,10 @@ export const devices = pgTable("devices", {
   reservationTokenHash: text("reservation_token_hash"),
   reservedUntil: timestamp("reserved_until", { withTimezone: true }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  // Last OTA status from the tracker's "fw" upload block.
+  firmwareVersion: text("firmware_version"),
+  firmwareStatus: jsonb("firmware_status").$type<FirmwareStatusInput>(),
+  firmwareReportedAt: timestamp("firmware_reported_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

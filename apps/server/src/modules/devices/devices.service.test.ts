@@ -51,6 +51,9 @@ describe("devices service helpers", () => {
       reservationTokenHash: null,
       reservedUntil: new Date("2026-06-17T12:00:00.000Z"),
       lastSeenAt: new Date("2026-06-17T10:00:00.000Z"),
+      firmwareVersion: null,
+      firmwareStatus: null,
+      firmwareReportedAt: null,
       createdAt: new Date("2026-06-16T10:00:00.000Z"),
       updatedAt: new Date("2026-06-17T11:00:00.000Z"),
     };

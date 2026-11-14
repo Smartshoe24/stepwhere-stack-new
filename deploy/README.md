@@ -1356,3 +1356,23 @@ local and do not leak through Supavisor to other requests.
 - Public HTTP is intentionally allowed only for `ingest.stepwhere.in`.
 - Admin image is static and has no runtime Infisical configuration.
 - Server runtime token lifecycle is delegated to VPS `~/.bashrc`.
+
+## OTA firmware hosting (device-ingest-proxy `/fw`)
+
+Trackers fetch `http://ingest.stepwhere.in/fw/manifest.json` once a day and
+download signed images from `/fw/releases/<x.y.z>/stepwhere.ota` in 4 KB
+byte ranges. The proxy reads them from, in order:
+
+- `FIRMWARE_UPSTREAM_URL`: base URL of the firmware bucket (S3/CloudFront),
+  e.g. `https://<distribution>.cloudfront.net`. Range is forwarded.
+- `FIRMWARE_DIR` (default `/srv/firmware`): a directory with the same layout,
+  mounted into the `stepwhere-device-ingest-proxy` container.
+
+Layout: `manifest.json`, optional `devices/<hardwareIdentifier>.json`,
+`releases/<x.y.z>/stepwhere.ota`. Produce them with
+`tools/fw_server.py publish` or the release workflow in
+`Smartshoe24/Stepwhere-Firmware`. Without either setting the proxy answers
+`/fw/*` with 404, so devices simply find no update.
+
+Setting the variable or mounting the directory is a deployment change and is
+done by a person (see AGENTS.md).

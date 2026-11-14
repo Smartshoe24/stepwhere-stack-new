@@ -535,6 +535,46 @@ export function DeviceDetailPage() {
                         label="Last seen"
                         value={<AdminLastSeen value={device.lastSeenAt} />}
                       />
+                      <KeyValue
+                        label="Firmware"
+                        value={device.firmware?.version ?? "Not reported"}
+                      />
+                      {device.firmware ? (
+                        <>
+                          <KeyValue
+                            label="Bootloader"
+                            value={device.firmware.bootloaderVersion ?? "None"}
+                          />
+                          <KeyValue
+                            label="Signing key"
+                            value={device.firmware.signingKey ?? "-"}
+                          />
+                          <KeyValue
+                            label="OTA state"
+                            value={device.firmware.otaState ?? "-"}
+                          />
+                          <KeyValue
+                            label="Last update"
+                            value={device.firmware.lastResult ?? "-"}
+                          />
+                          <KeyValue
+                            label="Available"
+                            value={
+                              device.firmware.availableVersion
+                                ? `${device.firmware.availableVersion}${
+                                  device.firmware.downloadPercent
+                                    ? ` (${device.firmware.downloadPercent}% downloaded)`
+                                    : ""
+                                }`
+                                : "-"
+                            }
+                          />
+                          <KeyValue
+                            label="Firmware reported"
+                            value={formatAdminDateTimeWithSeconds(device.firmware.reportedAt)}
+                          />
+                        </>
+                      ) : null}
                     </KeyValueList>
                   </RelationshipPanel>
                 </div>

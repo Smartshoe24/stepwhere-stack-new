@@ -924,6 +924,13 @@ export async function ingestLocation(input: LocationTelemetryInput) {
       .set({
         lastSeenAt: sampleAt,
         updatedAt: sampleAt,
+        ...(input.fw
+          ? {
+            firmwareVersion: input.fw.app,
+            firmwareStatus: input.fw,
+            firmwareReportedAt: sampleAt,
+          }
+          : {}),
       })
       .where(eq(devices.id, binding.device.id));
 

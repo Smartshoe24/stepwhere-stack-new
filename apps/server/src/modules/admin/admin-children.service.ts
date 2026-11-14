@@ -14,6 +14,7 @@ import { badRequest, notFound } from "../../shared/errors";
 import { toChildDetailDto } from "../children/children.mapper";
 import { getActiveSubscriptionForChild } from "../plans/plans.service";
 import { buildPaginatedResponse, parseAdminListQuery } from "./admin-list-query";
+import { toAdminDeviceFirmwareDto } from "../devices/device-firmware.mapper";
 
 const CHILD_SORTS = [
   "createdAt",
@@ -110,6 +111,7 @@ async function toAdminChildDetail(row: AdminChildRow): Promise<AdminChildDetailD
           reservedByOrganizationId: row.device.reservedByOrganizationId,
           reservedUntil: row.device.reservedUntil?.toISOString() ?? null,
         },
+        firmware: toAdminDeviceFirmwareDto(row.device),
       } : null,
       bindingId: row.binding?.id ?? null,
       boundAt: row.binding?.boundAt.toISOString() ?? null,
