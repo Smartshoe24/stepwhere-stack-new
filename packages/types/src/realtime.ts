@@ -1,7 +1,7 @@
 import type { ActivitySteppedEventDto } from "./activity";
 import type { OverviewResponseDto } from "./children";
 import type { HistoryUpdatedEventDto } from "./history";
-import type { QaBenchJobDto, QaSerialLine } from "./qa-bench";
+import type { QaAttentionDto, QaBenchJobDto, QaSerialLine } from "./qa-bench";
 import type { QaTestRunDto } from "./qa-tests";
 import type { ChildLiveResponseDto } from "./telemetry";
 
@@ -83,6 +83,7 @@ export type AdminRealtimeEvent =
   | { type: "admin:qa.job.log"; data: { stationId: string; jobId: string; lines: string[] } }
   | { type: "admin:qa.serial.data"; data: { stationId: string; path: string; lines: QaSerialLine[] } }
   | { type: "admin:qa.serial.error"; data: { stationId: string; path: string; message: string } }
+  | { type: "admin:qa.attention"; data: QaAttentionDto }
   /** A QA unit was created, flashed, linked to an IMEI or moved between stages. */
   | { type: "admin:qa.unit.changed"; data: { unitId: string; stationId: string | null } }
   /** Carries the run so the Bench checklist updates without refetching. */

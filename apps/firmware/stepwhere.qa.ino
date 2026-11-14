@@ -40,7 +40,7 @@
 
 #include "src/pedometer.h"
 
-#define QA_FW_VERSION "qa-0.5.0"
+#define QA_FW_VERSION "qa-0.6.0"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -66,6 +66,18 @@ constexpr uint8_t GPS_MIN_SATELLITES = 4;           // stepwhere.ino requires mo
 constexpr uint32_t STEP_WINDOW_MS = 60000;
 constexpr uint32_t STEP_START_LIMIT_MS = 10UL * 60UL * 1000UL;  // wait this long for QA GO
 constexpr uint16_t STEP_TARGET = 10;
+// Motion check. 0: the LIS2DH12 built-in self-test, no operator needed. 1: the
+// swing test (Start, then walk or swing the board). LIS2DS12 boards always swing.
+#ifndef QA_STEP_SWING_TEST
+#define QA_STEP_SWING_TEST 0
+#endif
+// LIS2DH12 self-test limits at ±2 g normal mode: 17-360 digits x 4 mg (datasheet
+// table 4; the same values as ST's lis2dh12_self_test.c).
+constexpr int32_t SELFTEST_MIN_MG = 68;
+constexpr int32_t SELFTEST_MAX_MG = 1440;
+constexpr uint8_t SELFTEST_SAMPLES = 5;
+constexpr uint32_t SELFTEST_SETTLE_MS = 90;          // > 4 samples at 50 Hz after a change
+constexpr uint32_t SELFTEST_SAMPLE_TIMEOUT_MS = 100;  // one sample is 20 ms at 50 Hz
 constexpr uint16_t WIFI_MIN_APS = 1;
 constexpr int32_t ACCEL_MIN_MG = 700;               // at rest the board reads about 1 g
 constexpr int32_t ACCEL_MAX_MG = 1300;
@@ -103,6 +115,11 @@ constexpr uint32_t VREFINT_CAL_VDDA_MV = 3000;  // the factory VREFINT value is 
 #define LIS2DH12_BDU_8G 0xA0         // CTRL_REG4: block data update, ±8 g
 #define LIS2DH12_FIFO_ENABLE 0x40    // CTRL_REG5
 #define LIS2DH12_FIFO_STREAM 0x80    // FIFO_CTRL: stream mode
+#define LIS2DH12_STATUS_REG 0x27
+#define LIS2DH12_ZYXDA 0x08            // STATUS_REG: new X, Y and Z data
+#define LIS2DH12_ODR_50HZ_XYZ 0x47     // CTRL_REG1: 50 Hz, normal mode, X/Y/Z on (self-test)
+#define LIS2DH12_ST_NONE 0x80          // CTRL_REG4: BDU, ±2 g, normal mode, self-test off
+#define LIS2DH12_ST_POSITIVE 0x82      // CTRL_REG4: the same with self-test 0 (positive sign)
 
 constexpr uint32_t ACCEL_POLL_INTERVAL_MS = 200;  // same as stepwhere.ino; the FIFO holds 1.28 s
 
@@ -221,6 +238,9 @@ struct BatteryReading {
 };
 
 enum class ChargeState : uint8_t { Idle, Charging, Complete, Invalid };
+struct AxesMg {
+  int32_t x = 0, y = 0, z = 0;
+};
 
 char chipUid[25] = "";
 volatile uint32_t stepInterrupts = 0;
@@ -1280,7 +1300,100 @@ uint32_t steps_now() {
   return count;
 }
 
+/**
+ * Averages `count` LIS2DH12 samples in normal mode (10-bit, ±2 g, 4 mg/digit),
+ * after discarding the first one as the ST procedure says. False on timeout.
+ */
+bool lis2dh12_average_normal(AxesMg &out, uint8_t count) {
+  int32_t sx = 0, sy = 0, sz = 0;
+  for (uint8_t i = 0; i < count + 1; i++) {
+    const uint32_t startedAt = millis();
+    uint8_t status = 0;
+    while (!(imu_read(LIS2DH12_STATUS_REG, &status, 1) && (status & LIS2DH12_ZYXDA))) {
+      if (millis() - startedAt > SELFTEST_SAMPLE_TIMEOUT_MS) return false;
+      wait_ms(2);
+    }
+    uint8_t raw[6];
+    if (!imu_read(LIS2DH12_OUT_X_L, raw, sizeof(raw))) return false;
+    if (i == 0) continue;  // first sample after a change is discarded
+    // Left-justified 10-bit: >> 6 gives the reading, 4 mg per digit at ±2 g.
+    sx += ((int16_t)(raw[0] | (raw[1] << 8)) >> 6) * 4;
+    sy += ((int16_t)(raw[2] | (raw[3] << 8)) >> 6) * 4;
+    sz += ((int16_t)(raw[4] | (raw[5] << 8)) >> 6) * 4;
+  }
+  out.x = sx / count;
+  out.y = sy / count;
+  out.z = sz / count;
+  return true;
+}
+
+/**
+ * The LIS2DH12's built-in self-test (ST's procedure, as in the STMems driver
+ * example lis2dh12_self_test.c): the chip pulls its own sensing element with
+ * an electrostatic force, and each axis must move by 68-1440 mg (17-360 digits
+ * at 4 mg/digit). It proves the mechanics and the readout work, with no one
+ * moving the board. Afterwards the shipping configuration is restored.
+ */
+void test_motion_self_test() {
+  report_running(T_STEPS);
+  const uint32_t startedAt = millis();
+  report_progress(T_STEPS, "Running the accelerometer self-test (keep the board still)");
+
+  imu_write(LIS2DH12_CTRL_REG1, 0x00);              // power down while configuring
+  imu_write(LIS2DH12_CTRL_REG2, 0x00);
+  imu_write(LIS2DH12_CTRL_REG3, 0x00);
+  imu_write(LIS2DH12_CTRL_REG5, 0x00);              // FIFO off: read the output registers directly
+  imu_write(LIS2DH12_FIFO_CTRL, 0x00);
+  imu_write(LIS2DH12_CTRL_REG4, LIS2DH12_ST_NONE);  // BDU, ±2 g, normal mode, self-test off
+  imu_write(LIS2DH12_CTRL_REG1, LIS2DH12_ODR_50HZ_XYZ);
+  wait_ms(SELFTEST_SETTLE_MS);
+  AxesMg off, on;
+  const bool offOk = lis2dh12_average_normal(off, SELFTEST_SAMPLES);
+
+  imu_write(LIS2DH12_CTRL_REG4, LIS2DH12_ST_POSITIVE);
+  wait_ms(SELFTEST_SETTLE_MS);
+  const bool onOk = offOk && lis2dh12_average_normal(on, SELFTEST_SAMPLES);
+
+  imu_write(LIS2DH12_CTRL_REG4, LIS2DH12_ST_NONE);  // self-test off before anything else
+  imu_write(LIS2DH12_CTRL_REG1, 0x00);
+  lis2dh12_configure();                             // back to the shipping configuration
+
+  const uint32_t ms = millis() - startedAt;
+  if (!onOk) {
+    result_line(T_STEPS, Outcome::Fail, ms, "Accelerometer gave no data during the self-test (I2C, or the sensor is stuck)")
+      .data().str("chip", "LIS2DH12").str("mode", "self-test").end();
+    return;
+  }
+  const int32_t dx = on.x > off.x ? on.x - off.x : off.x - on.x;
+  const int32_t dy = on.y > off.y ? on.y - off.y : off.y - on.y;
+  const int32_t dz = on.z > off.z ? on.z - off.z : off.z - on.z;
+  auto inRange = [](int32_t d) { return d >= SELFTEST_MIN_MG && d <= SELFTEST_MAX_MG; };
+  const char *error = nullptr;
+  if (!inRange(dx)) error = "Self-test: X axis did not move within 68-1440 mg (damaged sensor or bad solder)";
+  else if (!inRange(dy)) error = "Self-test: Y axis did not move within 68-1440 mg (damaged sensor or bad solder)";
+  else if (!inRange(dz)) error = "Self-test: Z axis did not move within 68-1440 mg (damaged sensor or bad solder)";
+  result_line(T_STEPS, error ? Outcome::Fail : Outcome::Pass, ms, error)
+    .data().str("chip", "LIS2DH12").str("mode", "self-test").num("dxMg", dx).num("dyMg", dy).num("dzMg", dz)
+    .num("minMg", SELFTEST_MIN_MG).num("maxMg", SELFTEST_MAX_MG).end();
+}
+
+void test_steps_swing();
+
+/**
+ * Motion check. By default, the LIS2DH12's built-in self-test: fully automatic.
+ * The operator swing test (walk or swing the board until the pedometer counts
+ * steps) runs instead on LIS2DS12 boards, or on every board when the firmware
+ * is built with -DQA_STEP_SWING_TEST=1.
+ */
 void test_steps() {
+  if (!QA_STEP_SWING_TEST && accelChip == AccelChip::Lis2dh12) {
+    test_motion_self_test();
+    return;
+  }
+  test_steps_swing();
+}
+
+void test_steps_swing() {
   report_running(T_STEPS);
   const bool softwarePedometer = accelChip == AccelChip::Lis2dh12;
   steps_reset();

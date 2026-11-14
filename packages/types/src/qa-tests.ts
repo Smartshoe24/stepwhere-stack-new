@@ -52,8 +52,9 @@ export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description:
   cell: { label: "Cell tower", description: "AT+NETDMSG returns a valid LTE serving cell." },
   data: { label: "Data link", description: "A data connection comes up with an IP address." },
   steps: {
-    label: "Step counter",
-    description: "Steps count while the board is walked or swung: the shoe pedometer on a LIS2DH12, the step interrupt on a LIS2DS12.",
+    label: "Motion self-test",
+    description:
+      "The LIS2DH12's built-in self-test moves each axis by 68-1440 mg, with no one touching the board. LIS2DS12 boards, or firmware built with QA_STEP_SWING_TEST=1, use the swing test instead.",
   },
   gps: {
     label: "GPS",

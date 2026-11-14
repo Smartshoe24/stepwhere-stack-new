@@ -1,0 +1,46 @@
+name: Admin CI
+
+# Lints and typechecks the admin app on pull requests, so a broken admin build
+# is caught before merge instead of failing Build And Release on main.
+# No secrets: the Vite build itself still runs in Build And Release.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/admin-ci.yml"
+      - "apps/admin/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint admin
+        run: pnpm --filter shadcn-admin lint
+
+      - name: Typecheck admin
+        run: pnpm --filter shadcn-admin exec tsc -b

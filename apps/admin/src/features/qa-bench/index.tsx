@@ -10,6 +10,7 @@ import {
   listQaFirmwareUploads,
   listQaStations,
   renameQaStation,
+  setQaStationAutomation,
   requestQaHardwareScan,
   revokeQaStation,
 } from '@/lib/api-client'
@@ -18,6 +19,7 @@ import { adminQueryKeys } from '@/features/admin/query-keys'
 import { Main } from '@/components/layout/main'
 import { FormField } from '@/components/patterns/key-value'
 import { PageHeader } from '@/components/patterns/page-header'
+import { Switch } from '@/components/ui/switch'
 import { Panel } from '@/components/patterns/panel'
 import { EmptyState, TableSkeleton } from '@/components/patterns/states'
 import {
@@ -136,6 +138,20 @@ export function QaBench() {
     onError: handleServerError,
   })
 
+  const automationMutation = useMutation({
+    mutationFn: (input: { stationId: string; enabled: boolean }) =>
+      setQaStationAutomation(input.stationId, { enabled: input.enabled }),
+    onSuccess: async (updated) => {
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.qa.stations() })
+      toast.success(
+        updated.automationEnabled
+          ? 'Automatic mode on: boards are flashed, tested and handed over without clicks.'
+          : 'Automatic mode off.'
+      )
+    },
+    onError: handleServerError,
+  })
+
   const selectStation = (stationId: string) =>
     void navigate({ search: { station: stationId } })
   const setView = (view: 'slots' | 'single') =>
@@ -150,6 +166,22 @@ export function QaBench() {
           meta={station ? <StationConnectionBadge station={station} /> : null}
           actions={
             <>
+              {station && hasSlots ? (
+                <label
+                  className='inline-flex items-center gap-2 text-sm text-ink-2'
+                  title='Every board clipped into a slot with its own ST-LINK is flashed with the newest QA firmware, tested, retried once on a network failure, and given the newest production firmware (.hex) when it passes.'
+                >
+                  <Switch
+                    checked={station.automationEnabled}
+                    disabled={automationMutation.isPending}
+                    onCheckedChange={(enabled) =>
+                      automationMutation.mutate({ stationId: station.id, enabled })
+                    }
+                    aria-label='Automatic mode'
+                  />
+                  Automatic
+                </label>
+              ) : null}
               {station && hasSlots ? (
                 <div
                   role='group'

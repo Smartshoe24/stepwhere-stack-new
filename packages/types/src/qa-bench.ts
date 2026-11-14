@@ -169,7 +169,24 @@ export type QaStationDto = {
   activeJobId: string | null;
   /** Every queued or running job. Jobs on different ST-LINKs run side by side. */
   activeJobIds: string[];
+  /** Bench automation: boards are identified, flashed, tested, retried and given production firmware without clicks. */
+  automationEnabled: boolean;
   createdAt: string;
+};
+
+export type UpdateQaStationAutomationInput = {
+  enabled: boolean;
+};
+
+/** Something on the bench that a person should look at, pushed to every open admin. */
+export type QaAttentionDto = {
+  stationId: string;
+  unitId: string | null;
+  slotId: string | null;
+  slotLabel: string | null;
+  level: "error" | "warning" | "success";
+  title: string;
+  message: string;
 };
 
 export type QaStationPairingDto = {

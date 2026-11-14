@@ -22,6 +22,7 @@ import {
   requireOnlineStation,
   revokeStation,
   sendToAgent,
+  setStationAutomation,
 } from "./qa-bench.service";
 import { getStationSlots, sendSlotCommand, updateStationSlots } from "./qa-slots.service";
 
@@ -104,6 +105,18 @@ qaBenchAdminRoutes.openapi(
     responses: { 200: dto("Station renamed."), ...adminErrors },
   }),
   async (c) => ok(c, await renameStation(c.req.valid("param").stationId, c.req.valid("json").name)),
+);
+
+qaBenchAdminRoutes.openapi(
+  createRoute({
+    method: "put",
+    path: "/admin/qa/stations/{stationId}/automation",
+    tags: TAGS,
+    security: bearerSecurity,
+    request: { params: stationParams, body: json(z.object({ enabled: z.boolean() })) },
+    responses: { 200: dto("Bench automation turned on or off."), ...adminErrors },
+  }),
+  async (c) => ok(c, await setStationAutomation(c.req.valid("param").stationId, c.req.valid("json").enabled)),
 );
 
 qaBenchAdminRoutes.openapi(

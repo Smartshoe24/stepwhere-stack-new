@@ -255,6 +255,7 @@ export async function getUnitDetail(unitId: string): Promise<QaUnitDetailDto> {
   return {
     ...toUnitListItem(row),
     notes: row.unit.notes,
+    functionalChecks: row.unit.functionalChecks ?? null,
     firmware,
     events,
     jobs,

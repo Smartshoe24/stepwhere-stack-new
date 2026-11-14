@@ -131,7 +131,7 @@ describe('describeSlot', () => {
     const view = describeSlot(
       slot({ run: run(results, 'passed'), verdict: { status: 'pending', failing: [], untested: ['steps'] } })
     )
-    expect(view).toMatchObject({ phase: 'stopped', headline: 'Not tested: Step counter' })
+    expect(view).toMatchObject({ phase: 'stopped', headline: 'Not tested: Motion self-test' })
     expect(view.action?.command).toBe('QA RUN steps')
   })
 

@@ -15,7 +15,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { QA_FIRMWARE_CHANNELS, QA_UNIT_STAGE_STATUSES, QA_UNIT_STAGES } from "@stepwhere/types";
-import type { QaAgentHello, QaJobResult, QaTestResultDto, QaUnitEventKind } from "@stepwhere/types";
+import type { QaAgentHello, QaFunctionalChecks, QaJobResult, QaTestResultDto, QaUnitEventKind } from "@stepwhere/types";
 
 import { users } from "./auth";
 import { devices } from "./core";
@@ -71,6 +71,8 @@ export const qaStations = pgTable("qa_stations", {
   agentInfo: jsonb("agent_info").$type<QaAgentHello | null>(),
   createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
   revokedAt: instant("revoked_at"),
+  /** Bench automation: flash, run, retry and hand over boards without clicks. Off until an admin turns it on. */
+  automationEnabled: boolean("automation_enabled").notNull().default(false),
   createdAt: instant("created_at").notNull().defaultNow(),
   updatedAt: instant("updated_at").notNull().defaultNow(),
 });
@@ -152,6 +154,8 @@ export const qaUnits = pgTable("qa_units", {
   firmwareUploadId: uuid("firmware_upload_id").references(() => qaFirmwareUploads.id, { onDelete: "set null" }),
   lastStationId: uuid("last_station_id").references(() => qaStations.id, { onDelete: "set null" }),
   notes: text("notes"),
+  /** What the board proved over the air after production firmware (functional tests). */
+  functionalChecks: jsonb("functional_checks").$type<QaFunctionalChecks | null>(),
   createdAt: instant("created_at").notNull().defaultNow(),
   updatedAt: instant("updated_at").notNull().defaultNow(),
 }, (t) => [
