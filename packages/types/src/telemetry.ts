@@ -180,6 +180,24 @@ export type ResolvedPositionDto = {
   observedAt: string;
 };
 
+/** OTA status reported by tracker firmware in every upload (Stepwhere-Firmware ota.ino). */
+export type FirmwareStatusInput = {
+  /** Running firmware version, "x.y.z". */
+  app: string;
+  /** Bootloader version, "" when the firmware runs without the OTA bootloader. */
+  boot?: string;
+  /** First 4 bytes of the signing key the bootloader trusts, hex. */
+  key?: string;
+  /** Boot metadata state: IDLE, PENDING, TRIAL, ... */
+  ota?: string;
+  /** Result of the last update: none, installed, confirmed, rejected, rolled_back, ... */
+  last?: string;
+  /** Newest version seen in a manifest, "" if none. */
+  avail?: string;
+  /** Download progress in percent. */
+  dl?: number;
+};
+
 export type LocationTelemetryInput = {
   hardwareIdentifier: string;
   latitude: number;
@@ -198,6 +216,7 @@ export type LocationTelemetryInput = {
   satelliteCount?: number | null;
   stepCounter: number;
   deviceState?: "active" | "sleep" | "offline";
+  fw?: FirmwareStatusInput;
 };
 
 export type StepTelemetryInput = {

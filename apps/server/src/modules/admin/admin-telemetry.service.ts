@@ -25,6 +25,7 @@ import { getChildActivityForOrganization } from "../activity/activity.service";
 import { getAdminChildById } from "./admin-children.service";
 import { getChildTrailForOrganization } from "../telemetry/telemetry.service";
 import { deriveConnectivityState } from "../telemetry/telemetry.helpers";
+import { toAdminDeviceFirmwareDto } from "../devices/device-firmware.mapper";
 
 function buildLocationDateFilters(
   column: typeof locationEvents.occurredAt,
@@ -239,6 +240,7 @@ export async function getAdminDeviceLiveTelemetry(
         reservedByOrganizationId: context.device.reservedByOrganizationId,
         reservedUntil: context.device.reservedUntil?.toISOString() ?? null,
       },
+      firmware: toAdminDeviceFirmwareDto(context.device),
     },
     child: adminChild,
     location: {

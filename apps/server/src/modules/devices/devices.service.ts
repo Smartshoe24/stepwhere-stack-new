@@ -18,6 +18,7 @@ import { childDeviceBindings, children, deviceOwnerships, devices, locationEvent
 import { generateOpaqueToken, sha256 } from "../../shared/crypto";
 import { conflict, notFound, unauthorized } from "../../shared/errors";
 import { toIsoString } from "../../shared/mappers";
+import { toAdminDeviceFirmwareDto } from "./device-firmware.mapper";
 import { buildPaginatedResponse, parseAdminListQuery } from "../admin/admin-list-query";
 import { getAdminDeviceTelemetryReliability } from "../admin/admin-device-reliability.service";
 
@@ -62,6 +63,7 @@ export function toAdminDeviceDto(input: typeof devices.$inferSelect | AdminDevic
       reservedByOrganizationId: device.reservedByOrganizationId,
       reservedUntil: toIsoString(device.reservedUntil),
     },
+    firmware: toAdminDeviceFirmwareDto(device),
   };
 }
 

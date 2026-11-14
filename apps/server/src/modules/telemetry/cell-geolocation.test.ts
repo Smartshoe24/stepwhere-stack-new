@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   advanceCellLookupAfterSuccess,
   CELL_FAST_INTERVAL_MS,
+  CELL_INITIAL_DELAY_MS,
   CELL_NORMAL_INTERVAL_MS,
+  getCellLookupIntervals,
   getInitialCellLookupAt,
   isCellLookupDue,
   shouldLookupEveryCellObservation,
@@ -12,9 +14,20 @@ import {
 describe("cell geolocation cadence", () => {
   const observedAt = new Date("2026-09-16T10:00:00.000Z");
 
-  it("waits seven minutes before the first outage lookup", () => {
+  it("waits two minutes before the first outage lookup", () => {
+    expect(CELL_INITIAL_DELAY_MS).toBe(2 * 60 * 1_000);
     expect(getInitialCellLookupAt(observedAt).getTime()).toBe(
-      observedAt.getTime() + CELL_NORMAL_INTERVAL_MS,
+      observedAt.getTime() + CELL_INITIAL_DELAY_MS,
+    );
+  });
+
+  it("keeps the simulator's first lookup at one normal interval", () => {
+    const intervals = getCellLookupIntervals(
+      { cellLookupNormalIntervalSeconds: 30, cellLookupFastIntervalSeconds: 5 } as never,
+      "development",
+    );
+    expect(getInitialCellLookupAt(observedAt, intervals).getTime()).toBe(
+      observedAt.getTime() + 30_000,
     );
   });
 

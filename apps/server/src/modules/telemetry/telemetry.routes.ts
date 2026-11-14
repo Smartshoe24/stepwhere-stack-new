@@ -202,6 +202,17 @@ const telemetryDebugSchema = z.object({
   }),
 });
 
+// OTA status block from the tracker firmware (Stepwhere-Firmware ota.ino).
+const firmwareStatusSchema = z.object({
+  app: z.string().trim().min(1).max(16),
+  boot: z.string().max(16).optional(),
+  key: z.string().max(16).optional(),
+  ota: z.string().max(16).optional(),
+  last: z.string().max(24).optional(),
+  avail: z.string().max(16).optional(),
+  dl: z.number().int().min(0).max(100).optional(),
+});
+
 const locationSchema = z.object({
   hardwareIdentifier: z.string().trim().min(1),
   latitude: z.number().min(-90).max(90),
@@ -218,6 +229,7 @@ const locationSchema = z.object({
   satelliteCount: z.number().int().nonnegative().nullable().optional(),
   stepCounter: z.number().int().nonnegative(),
   deviceState: z.enum(["active", "sleep", "offline"]).optional(),
+  fw: firmwareStatusSchema.optional(),
 });
 
 const stepSchema = z.object({

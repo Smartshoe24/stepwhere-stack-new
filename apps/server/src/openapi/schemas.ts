@@ -669,6 +669,16 @@ export const AdminDeviceSchema = z.object({
     reservedByOrganizationId: UuidSchema.nullable(),
     reservedUntil: NullableDateTimeSchema,
   }),
+  firmware: z.object({
+    version: z.string(),
+    bootloaderVersion: NullableStringSchema,
+    signingKey: NullableStringSchema,
+    otaState: NullableStringSchema,
+    lastResult: NullableStringSchema,
+    availableVersion: NullableStringSchema,
+    downloadPercent: z.number().int().nullable(),
+    reportedAt: DateTimeSchema,
+  }).nullable(),
 }).openapi("AdminDevice");
 
 export const AdminDeviceTelemetryReliabilitySchema = z.object({

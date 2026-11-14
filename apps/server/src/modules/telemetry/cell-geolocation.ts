@@ -7,6 +7,9 @@ import type {
 import { haversineDistanceMeters } from "../geofences/geofence-distance";
 import { getEligibleWifiAccessPoints } from "./wifi-geolocation";
 
+// First Wi-Fi/cell lookup this long after GPS is lost: soon enough that a
+// still tracker (it sleeps after ~5 min without steps) gets a position first.
+export const CELL_INITIAL_DELAY_MS = 2 * 60 * 1_000;
 export const CELL_NORMAL_INTERVAL_MS = 7 * 60 * 1_000;
 export const CELL_FAST_INTERVAL_MS = 60 * 1_000;
 export const CELL_LOOKUP_LEASE_MS = 15_000;
@@ -16,11 +19,13 @@ export const CELL_STABLE_SAMPLE_TARGET = 7;
 export type CellLookupMode = "normal" | "fast";
 
 export type CellLookupIntervals = {
+  initialDelayMs: number;
   normalIntervalMs: number;
   fastIntervalMs: number;
 };
 
 export const DEFAULT_CELL_LOOKUP_INTERVALS: CellLookupIntervals = {
+  initialDelayMs: CELL_INITIAL_DELAY_MS,
   normalIntervalMs: CELL_NORMAL_INTERVAL_MS,
   fastIntervalMs: CELL_FAST_INTERVAL_MS,
 };
@@ -40,7 +45,9 @@ export function getCellLookupIntervals(
     return DEFAULT_CELL_LOOKUP_INTERVALS;
   }
 
+  // The simulator keeps its own cadence: the first lookup after one normal interval.
   return {
+    initialDelayMs: simulation.cellLookupNormalIntervalSeconds * 1_000,
     normalIntervalMs: simulation.cellLookupNormalIntervalSeconds * 1_000,
     fastIntervalMs: simulation.cellLookupFastIntervalSeconds * 1_000,
   };
@@ -50,7 +57,7 @@ export function getInitialCellLookupAt(
   outageStartedAt: Date,
   intervals = DEFAULT_CELL_LOOKUP_INTERVALS,
 ) {
-  return new Date(outageStartedAt.getTime() + intervals.normalIntervalMs);
+  return new Date(outageStartedAt.getTime() + intervals.initialDelayMs);
 }
 
 export function hasUsableCellObservation(

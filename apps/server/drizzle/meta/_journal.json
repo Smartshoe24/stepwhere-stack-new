@@ -141,6 +141,13 @@
       "when": 1794643714325,
       "tag": "0019_qa_automation",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794666753183,
+      "tag": "0020_device_firmware_status",
+      "breakpoints": true
     }
   ]
 }

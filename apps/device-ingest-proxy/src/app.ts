@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { Hono } from "hono";
 
+import { handleFirmware } from "./firmware";
+
 // Prod reaches the API by its Docker service name; the local stack overrides it.
 const UPSTREAM_LOCATION_URL =
   process.env.UPSTREAM_LOCATION_URL ?? "http://server:8223/v1/telemetry/location";
@@ -39,6 +41,9 @@ app.get("/health", (c) => {
     service: "stepwhere-device-ingest-proxy",
   });
 });
+
+// OTA firmware for trackers: manifest and signed images (see firmware.ts).
+app.on(["GET", "HEAD"], "/fw/*", handleFirmware);
 
 app.post("/location", async (c) => {
   const startedAt = Date.now();
