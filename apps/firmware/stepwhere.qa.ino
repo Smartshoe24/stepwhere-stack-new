@@ -108,29 +108,29 @@ constexpr uint32_t ACCEL_POLL_INTERVAL_MS = 200;  // same as stepwhere.ino; the 
 
 // W25Q128 external flash (IC8). Same pins as the OTA flash driver. It sits on the
 // MCU supply (it answers with the modem/GPS rail off), so the test needs nothing first.
-#define FLASH_MOSI PA7
-#define FLASH_MISO PA6
-#define FLASH_SCK PA5
-#define FLASH_CS PC6
-#define FLASH_WP PC7     // driven high: low blocks status-register writes
-#define FLASH_HOLD PB12  // driven high: low pauses the chip and reads return 0xFF
-constexpr uint32_t FLASH_JEDEC_EXPECTED = 0xEF4018;  // Winbond (EF), W25Q128 (40 18)
-constexpr uint32_t FLASH_SPI_HZ = 4000000;
-constexpr uint8_t FLASH_CMD_RELEASE_PD = 0xAB;
-constexpr uint8_t FLASH_CMD_JEDEC_ID = 0x9F;
-constexpr uint8_t FLASH_CMD_WRITE_ENABLE = 0x06;
-constexpr uint8_t FLASH_CMD_READ_SR1 = 0x05;
-constexpr uint8_t FLASH_CMD_READ = 0x03;
-constexpr uint8_t FLASH_CMD_PAGE_PROGRAM = 0x02;
-constexpr uint8_t FLASH_CMD_SECTOR_ERASE = 0x20;
-constexpr uint8_t FLASH_SR1_BUSY = 0x01;
-constexpr uint16_t FLASH_PAGE_SIZE = 256;
+#define W25Q_MOSI PA7
+#define W25Q_MISO PA6
+#define W25Q_SCK PA5
+#define W25Q_CS PC6
+#define W25Q_WP PC7     // driven high: low blocks status-register writes
+#define W25Q_HOLD PB12  // driven high: low pauses the chip and reads return 0xFF
+constexpr uint32_t W25Q_JEDEC_EXPECTED = 0xEF4018;  // Winbond (EF), W25Q128 (40 18)
+constexpr uint32_t W25Q_SPI_HZ = 4000000;
+constexpr uint8_t W25Q_CMD_RELEASE_PD = 0xAB;
+constexpr uint8_t W25Q_CMD_JEDEC_ID = 0x9F;
+constexpr uint8_t W25Q_CMD_WRITE_ENABLE = 0x06;
+constexpr uint8_t W25Q_CMD_READ_SR1 = 0x05;
+constexpr uint8_t W25Q_CMD_READ = 0x03;
+constexpr uint8_t W25Q_CMD_PAGE_PROGRAM = 0x02;
+constexpr uint8_t W25Q_CMD_SECTOR_ERASE = 0x20;
+constexpr uint8_t W25Q_SR1_BUSY = 0x01;
+constexpr uint16_t W25Q_PAGE_SIZE = 256;
 // The last 4 KB sector: EXT_SELFTEST_ADDR in the OTA layout (Smartshoe24/Stepwhere-Firmware,
 // libraries/StepwhereOTA/src/ota_layout.h), outside every OTA slot and the motion log.
 // The flash self-test uses the same sector, so a QA run never touches real data.
-constexpr uint32_t FLASH_TEST_ADDR = 0xFFF000;
-constexpr uint32_t FLASH_ERASE_TIMEOUT_MS = 1000;   // tSE max 400 ms
-constexpr uint32_t FLASH_PROGRAM_TIMEOUT_MS = 20;   // tPP max 3 ms
+constexpr uint32_t W25Q_TEST_ADDR = 0xFFF000;
+constexpr uint32_t W25Q_ERASE_TIMEOUT_MS = 1000;   // tSE max 400 ms
+constexpr uint32_t W25Q_PROGRAM_TIMEOUT_MS = 20;   // tPP max 3 ms
 
 constexpr uint32_t CONSOLE_BAUD = 115200;
 constexpr uint32_t GSM_BAUD = 115200;
@@ -147,7 +147,7 @@ HardwareSerial SerialGSM(PA3, PA2);
 HardwareSerial SerialGPS(PB9, PB8);
 HardwareSerial SerialDBG(PB7, PB6);
 TwoWire qaI2c(I2C_SDA, I2C_SCL);
-SPIClass flashSpi(FLASH_MOSI, FLASH_MISO, FLASH_SCK);
+SPIClass flashSpi(W25Q_MOSI, W25Q_MISO, W25Q_SCK);
 TinyGPSPlus gps;
 // GSV field 3 is "satellites in view" for each constellation's talker.
 TinyGPSCustom gsvGps(gps, "GPGSV", 3);
@@ -210,6 +210,17 @@ struct ServingCell {
   int16_t rsrpTenthsDbm = 0;
   char duplex[4] = "";
 };
+
+// Types used in function signatures must be declared before the first function:
+// the Arduino builder inserts its generated prototypes there.
+struct BatteryReading {
+  uint32_t mv = 0;       // battery voltage after the 1:2 divider
+  uint16_t raw = 0;      // PB10, 12-bit, averaged
+  uint32_t vddaMv = 0;   // MCU analog supply, from VREFINT
+  bool factoryCal = false;
+};
+
+enum class ChargeState : uint8_t { Idle, Charging, Complete, Invalid };
 
 char chipUid[25] = "";
 volatile uint32_t stepInterrupts = 0;
@@ -380,13 +391,6 @@ void wait_ms(uint32_t durationMs) {
 
 // ─── Power ────────────────────────────────────────────────────────────────────
 
-struct BatteryReading {
-  uint32_t mv = 0;       // battery voltage after the 1:2 divider
-  uint16_t raw = 0;      // PB10, 12-bit, averaged
-  uint32_t vddaMv = 0;   // MCU analog supply, from VREFINT
-  bool factoryCal = false;
-};
-
 /** The G0's factory VREFINT reading, taken at VDDA = 3.0 V. 0 if it looks unprogrammed. */
 uint16_t vrefint_factory_cal() {
   const uint16_t cal = QA_READ_VREFINT_CAL();
@@ -418,8 +422,6 @@ BatteryReading read_battery() {
 uint32_t battery_mv() {
   return read_battery().mv;
 }
-
-enum class ChargeState : uint8_t { Idle, Charging, Complete, Invalid };
 
 /** TP4056 CHRG / STDBY, open-drain and active low (as stepwhere.ino reads them). */
 ChargeState read_charge_state(bool &chrgLow, bool &stdbyLow) {
@@ -889,18 +891,18 @@ void test_imu() {
 
 /** One SPI command to the flash: sends `command`, then clocks out `count` bytes into `out`. */
 void flash_command(uint8_t command, uint8_t *out, uint8_t count) {
-  flashSpi.beginTransaction(SPISettings(FLASH_SPI_HZ, MSBFIRST, SPI_MODE0));
-  digitalWrite(FLASH_CS, LOW);
+  flashSpi.beginTransaction(SPISettings(W25Q_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(W25Q_CS, LOW);
   flashSpi.transfer(command);
   for (uint8_t i = 0; i < count; i++) out[i] = flashSpi.transfer(0x00);
-  digitalWrite(FLASH_CS, HIGH);
+  digitalWrite(W25Q_CS, HIGH);
   flashSpi.endTransaction();
 }
 
 /** A command with a 24-bit address, then `count` bytes clocked in (`in`) or out (`out`). */
 void flash_command_addr(uint8_t command, uint32_t address, const uint8_t *out, uint8_t *in, uint16_t count) {
-  flashSpi.beginTransaction(SPISettings(FLASH_SPI_HZ, MSBFIRST, SPI_MODE0));
-  digitalWrite(FLASH_CS, LOW);
+  flashSpi.beginTransaction(SPISettings(W25Q_SPI_HZ, MSBFIRST, SPI_MODE0));
+  digitalWrite(W25Q_CS, LOW);
   flashSpi.transfer(command);
   flashSpi.transfer((uint8_t)(address >> 16));
   flashSpi.transfer((uint8_t)(address >> 8));
@@ -909,20 +911,20 @@ void flash_command_addr(uint8_t command, uint32_t address, const uint8_t *out, u
     const uint8_t got = flashSpi.transfer(out ? out[i] : 0x00);
     if (in) in[i] = got;
   }
-  digitalWrite(FLASH_CS, HIGH);
+  digitalWrite(W25Q_CS, HIGH);
   flashSpi.endTransaction();
 }
 
 uint8_t flash_status() {
   uint8_t sr1 = 0xFF;
-  flash_command(FLASH_CMD_READ_SR1, &sr1, 1);
+  flash_command(W25Q_CMD_READ_SR1, &sr1, 1);
   return sr1;
 }
 
 /** Waits for BUSY to clear. Returns false on timeout. */
 bool flash_wait_ready(uint32_t timeoutMs) {
   const uint32_t startedAt = millis();
-  while (flash_status() & FLASH_SR1_BUSY) {
+  while (flash_status() & W25Q_SR1_BUSY) {
     if (millis() - startedAt > timeoutMs) return false;
     delay(1);
   }
@@ -931,8 +933,8 @@ bool flash_wait_ready(uint32_t timeoutMs) {
 
 /** True if `count` bytes at `address` equal `expected` (or are all 0xFF when it is null). */
 bool flash_verify(uint32_t address, const uint8_t *expected, uint16_t count, uint16_t &firstBad) {
-  uint8_t buffer[FLASH_PAGE_SIZE];
-  flash_command_addr(FLASH_CMD_READ, address, nullptr, buffer, count);
+  uint8_t buffer[W25Q_PAGE_SIZE];
+  flash_command_addr(W25Q_CMD_READ, address, nullptr, buffer, count);
   for (uint16_t i = 0; i < count; i++) {
     if (buffer[i] != (expected ? expected[i] : 0xFF)) {
       firstBad = i;
@@ -943,10 +945,10 @@ bool flash_verify(uint32_t address, const uint8_t *expected, uint16_t count, uin
 }
 
 bool flash_erase_test_sector(uint32_t &eraseMs) {
-  flash_command(FLASH_CMD_WRITE_ENABLE, nullptr, 0);
+  flash_command(W25Q_CMD_WRITE_ENABLE, nullptr, 0);
   const uint32_t startedAt = millis();
-  flash_command_addr(FLASH_CMD_SECTOR_ERASE, FLASH_TEST_ADDR, nullptr, nullptr, 0);
-  const bool ok = flash_wait_ready(FLASH_ERASE_TIMEOUT_MS);
+  flash_command_addr(W25Q_CMD_SECTOR_ERASE, W25Q_TEST_ADDR, nullptr, nullptr, 0);
+  const bool ok = flash_wait_ready(W25Q_ERASE_TIMEOUT_MS);
   eraseMs = millis() - startedAt;
   return ok;
 }
@@ -959,21 +961,21 @@ bool flash_erase_test_sector(uint32_t &eraseMs) {
 const char *flash_write_test(uint32_t &eraseMs, uint32_t &programMs) {
   uint16_t bad = 0;
   if (!flash_erase_test_sector(eraseMs)) return "Erase timed out (BUSY never cleared)";
-  if (!flash_verify(FLASH_TEST_ADDR, nullptr, FLASH_PAGE_SIZE, bad)) {
+  if (!flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, bad)) {
     return "Erase did not take (write-protected, /WP PC7 low, or SR1 protect bits set)";
   }
 
-  uint8_t pattern[FLASH_PAGE_SIZE];
-  for (uint16_t i = 0; i < FLASH_PAGE_SIZE; i++) pattern[i] = (uint8_t)(i ^ 0xA5);
-  flash_command(FLASH_CMD_WRITE_ENABLE, nullptr, 0);
+  uint8_t pattern[W25Q_PAGE_SIZE];
+  for (uint16_t i = 0; i < W25Q_PAGE_SIZE; i++) pattern[i] = (uint8_t)(i ^ 0xA5);
+  flash_command(W25Q_CMD_WRITE_ENABLE, nullptr, 0);
   const uint32_t startedAt = millis();
-  flash_command_addr(FLASH_CMD_PAGE_PROGRAM, FLASH_TEST_ADDR, pattern, nullptr, FLASH_PAGE_SIZE);
-  const bool programmed = flash_wait_ready(FLASH_PROGRAM_TIMEOUT_MS);
+  flash_command_addr(W25Q_CMD_PAGE_PROGRAM, W25Q_TEST_ADDR, pattern, nullptr, W25Q_PAGE_SIZE);
+  const bool programmed = flash_wait_ready(W25Q_PROGRAM_TIMEOUT_MS);
   programMs = millis() - startedAt;
   if (!programmed) return "Page program timed out (BUSY never cleared)";
-  if (!flash_verify(FLASH_TEST_ADDR, pattern, FLASH_PAGE_SIZE, bad)) {
+  if (!flash_verify(W25Q_TEST_ADDR, pattern, W25Q_PAGE_SIZE, bad)) {
     uint16_t unused = 0;
-    const bool stillErased = flash_verify(FLASH_TEST_ADDR, nullptr, FLASH_PAGE_SIZE, unused);
+    const bool stillErased = flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, unused);
     uint32_t cleanupMs = 0;
     flash_erase_test_sector(cleanupMs);  // best effort: leave the test sector clean
     return stillErased ? "Nothing was written (write-protected: /WP PC7 low, or SR1 protect bits set)"
@@ -981,7 +983,7 @@ const char *flash_write_test(uint32_t &eraseMs, uint32_t &programMs) {
   }
 
   uint32_t cleanupMs = 0;
-  if (!flash_erase_test_sector(cleanupMs) || !flash_verify(FLASH_TEST_ADDR, nullptr, FLASH_PAGE_SIZE, bad)) {
+  if (!flash_erase_test_sector(cleanupMs) || !flash_verify(W25Q_TEST_ADDR, nullptr, W25Q_PAGE_SIZE, bad)) {
     return "Second erase failed";
   }
   return nullptr;
@@ -994,29 +996,29 @@ const char *flash_write_test(uint32_t &eraseMs, uint32_t &programMs) {
 void test_flash() {
   report_running(T_FLASH);
   const uint32_t startedAt = millis();
-  pinMode(FLASH_CS, OUTPUT);
-  digitalWrite(FLASH_CS, HIGH);
-  pinMode(FLASH_WP, OUTPUT);
-  digitalWrite(FLASH_WP, HIGH);
-  pinMode(FLASH_HOLD, OUTPUT);
-  digitalWrite(FLASH_HOLD, HIGH);
+  pinMode(W25Q_CS, OUTPUT);
+  digitalWrite(W25Q_CS, HIGH);
+  pinMode(W25Q_WP, OUTPUT);
+  digitalWrite(W25Q_WP, HIGH);
+  pinMode(W25Q_HOLD, OUTPUT);
+  digitalWrite(W25Q_HOLD, HIGH);
   flashSpi.begin();
   delay(1);
 
   // The chip may have been left in deep power-down; it ignores 9Fh until released.
-  flash_command(FLASH_CMD_RELEASE_PD, nullptr, 0);
+  flash_command(W25Q_CMD_RELEASE_PD, nullptr, 0);
   delayMicroseconds(50);  // tRES1 is 3 µs
   uint8_t id[3] = {0, 0, 0};
-  flash_command(FLASH_CMD_JEDEC_ID, id, 3);
+  flash_command(W25Q_CMD_JEDEC_ID, id, 3);
 
   const uint32_t jedec = ((uint32_t)id[0] << 16) | ((uint32_t)id[1] << 8) | id[2];
   char idHex[7];
   snprintf(idHex, sizeof(idHex), "%02X%02X%02X", id[0], id[1], id[2]);
   char expectedHex[7];
-  snprintf(expectedHex, sizeof(expectedHex), "%06lX", (unsigned long)FLASH_JEDEC_EXPECTED);
+  snprintf(expectedHex, sizeof(expectedHex), "%06lX", (unsigned long)W25Q_JEDEC_EXPECTED);
 
   const char *error = nullptr;
-  if (jedec == FLASH_JEDEC_EXPECTED) {
+  if (jedec == W25Q_JEDEC_EXPECTED) {
     // pass
   } else if (jedec == 0xFFFFFF) error = "No answer from the memory chip (MISO PA6 open, /CS PC6, /HOLD PB12 or its supply)";
   else if (jedec == 0x000000) error = "Memory chip ID reads 00 00 00 (MISO PA6 stuck low, or the chip has no supply)";
@@ -1033,7 +1035,7 @@ void test_flash() {
   char sr1Hex[5];
   snprintf(sr1Hex, sizeof(sr1Hex), "0x%02X", sr1);
   char testAddrHex[7];
-  snprintf(testAddrHex, sizeof(testAddrHex), "%06lX", (unsigned long)FLASH_TEST_ADDR);
+  snprintf(testAddrHex, sizeof(testAddrHex), "%06lX", (unsigned long)W25Q_TEST_ADDR);
 
   QaLine line = result_line(T_FLASH, error ? Outcome::Fail : Outcome::Pass, millis() - startedAt, error);
   line.data().str("jedecId", idHex).str("expected", expectedHex);
