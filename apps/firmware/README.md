@@ -551,6 +551,11 @@ still to come.) Build it with:
 pnpm --filter @stepwhere/firmware build:qa
 ```
 
+(macOS or Linux.) From any computer, including Windows, use GitHub instead:
+**Actions → Firmware Build → Run workflow**, pick the branch and `qa`, then
+download the files under **Artifacts** on the finished run. The same workflow
+builds the QA firmware on every pull request that changes `apps/firmware/`.
+
 The QA build targets **Generic G070CBTx** (`pnum=GENERIC_G070CBTX`): Rev11 boards
 carry an STM32G070CBT6, and this is the target the production firmware v2.2.0
 in `Smartshoe24/Stepwhere-Firmware` was tested with. Artifacts land in

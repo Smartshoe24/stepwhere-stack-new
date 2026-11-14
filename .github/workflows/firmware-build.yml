@@ -1,0 +1,105 @@
+# Firmware Build: compiles the Stepwhere firmware on GitHub's runners and
+# offers the files (.hex, .bin, .elf, .map) as a download.
+#
+# - On a pull request that touches apps/firmware/, it builds the QA firmware
+#   and runs the firmware host tests, so every firmware change is compiled for
+#   the real target (STM32G070 for qa) before it is merged.
+# - Actions -> Firmware Build -> Run workflow builds any variant on demand, from
+#   any branch. The files appear under "Artifacts" on the run's page.
+#
+# Build only: no credentials, nothing is deployed, flashed or published.
+
+name: Firmware Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/firmware/**"
+      - ".github/workflows/firmware-build.yml"
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Firmware to build"
+        type: choice
+        default: qa
+        options:
+          - qa
+          - main
+          - dev
+          - capture
+          - accel-test
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-build-${{ github.ref }}-${{ inputs.variant || 'qa' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VARIANT: ${{ inputs.variant || 'qa' }}
+    defaults:
+      run:
+        working-directory: apps/firmware
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache arduino-cli, the STM32 core and libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/firmware/.builds/tools
+            apps/firmware/.builds/arduino-data
+            apps/firmware/.builds/arduino-libraries
+          key: arduino-${{ runner.os }}-${{ hashFiles('apps/firmware/scripts/build-arduino.sh', 'apps/firmware/arduino-cli.yaml') }}
+
+      - name: Host tests (pedometer, radio parsers)
+        run: |
+          mkdir -p .builds/host
+          for test in host_tests replay_capture; do
+            c++ -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined "test/${test}.cpp" -o ".builds/host/${test}"
+          done
+          .builds/host/host_tests
+
+      - name: Build ${{ env.VARIANT }}
+        run: bash scripts/build-arduino.sh "$VARIANT"
+
+      - name: Size and checksums
+        run: |
+          shopt -s globstar nullglob
+          files=(.builds/artifacts/**/*.ino.{hex,bin,elf})
+          size_tool="$(find .builds/arduino-data -type f -name arm-none-eabi-size | head -n 1)"
+          {
+            echo "### Firmware \`${VARIANT}\` (commit \`${GITHUB_SHA::7}\`)"
+            echo
+            if [[ -n "$size_tool" ]]; then
+              for elf in .builds/artifacts/**/*.ino.elf; do
+                echo '```'
+                "$size_tool" "$elf"
+                echo '```'
+              done
+              echo "STM32G070CB: 128 KB flash, 36 KB RAM (text + data must fit flash; data + bss must fit RAM)."
+            fi
+            echo
+            echo "| File | SHA-256 |"
+            echo "|---|---|"
+            for f in "${files[@]}"; do
+              echo "| \`$(basename "$f")\` | \`$(sha256sum "$f" | cut -d' ' -f1)\` |"
+            done
+            echo
+            echo "Download the files under **Artifacts** below. On the Bench, upload the \`.hex\` with the matching channel (**QA firmware** for \`qa\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload firmware files
+        uses: actions/upload-artifact@v4
+        with:
+          name: stepwhere-${{ env.VARIANT }}-firmware-${{ github.sha }}
+          path: apps/firmware/.builds/artifacts/
+          if-no-files-found: error
+          retention-days: 30
