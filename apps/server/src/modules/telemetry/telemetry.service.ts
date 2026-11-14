@@ -60,6 +60,7 @@ import { recordActivityInterval } from "../activity/activity-rollup.service";
 import { markHistoryDirty } from "../history/history-materializer";
 import { historyWorker } from "../history/history-worker";
 import { isOrganizationDeletionPending } from "../account-deletion/account-deletion.service";
+import { withQaFunctionalEvidence } from "../qa-units/qa-functional.service";
 import {
   advanceCellLookupAfterSuccess,
   CELL_LOOKUP_LEASE_MS,
@@ -601,7 +602,8 @@ export async function ingestLocation(input: LocationTelemetryInput) {
     cellular: input.cellular,
     wifi: input.wifi,
   });
-  const result = await db.transaction(async (tx) => {
+  // A refused report from an unbound QA board still counts for its functional tests.
+  const result = await withQaFunctionalEvidence(hardwareIdentifier, input, () => db.transaction(async (tx) => {
     await tx.execute(sql.raw("SET LOCAL statement_timeout = '12s'"));
     await tx.execute(sql.raw("SET LOCAL lock_timeout = '3s'"));
     await tx.execute(sql.raw("SET LOCAL idle_in_transaction_session_timeout = '12s'"));
@@ -971,7 +973,7 @@ export async function ingestLocation(input: LocationTelemetryInput) {
         occurredAt: sampleAt.toISOString(),
       } satisfies ActivitySteppedEventDto,
     };
-  });
+  }));
 
   let cellPromotion: Awaited<ReturnType<typeof promoteCellLocation>> = null;
 

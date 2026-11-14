@@ -134,6 +134,13 @@
       "when": 1792501861225,
       "tag": "0018_qa_station_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794643714325,
+      "tag": "0019_qa_automation",
+      "breakpoints": true
     }
   ]
 }

@@ -69,6 +69,11 @@ class QaBenchRegistry {
     return this.connections.get(stationId) ?? null;
   }
 
+  /** Stations whose agent is connected right now. */
+  onlineStationIds() {
+    return [...this.connections.keys()];
+  }
+
   isOnline(stationId: string) {
     return this.connections.has(stationId);
   }

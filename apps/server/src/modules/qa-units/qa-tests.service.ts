@@ -4,7 +4,9 @@ import type { QaBoardTestId, QaSerialLine, QaTtlMessage } from "@stepwhere/types
 
 import { db } from "../../db/client";
 import { qaTestRuns, qaUnits } from "../../db/schema";
+import { handleRunFinished } from "../qa-bench/qa-automation.service";
 import { findSlotIdForPort } from "../qa-bench/qa-slots.service";
+import { getSafeErrorDetails } from "../../shared/background-task";
 import { applyTtlMessage, combineBoardTestRuns, countResults, emptyResults, parseQaTtlLine } from "./qa-tests.helpers";
 import { listFinishedUnitRuns, loadRunDto } from "./qa-test-runs.query";
 import { broadcastTestRunChanged, broadcastUnitChanged } from "./qa-units.realtime";
@@ -157,6 +159,16 @@ async function finishRun(run: RunRow, stationId: string) {
   });
 
   broadcastUnitChanged(unit.id, stationId);
+
+  if (!scrapped) {
+    await handleRunFinished({
+      stationId,
+      slotId: run.slotId,
+      unitId: unit.id,
+      chipUid: unit.chipUid,
+      verdict: { status: verdict.status, failing: verdict.failing, untested: verdict.untested },
+    }).catch((error) => console.error("[qa-tests] automation failed after a run", getSafeErrorDetails(error)));
+  }
 }
 
 async function handleMessage(port: Port, message: QaTtlMessage, at: Date) {

@@ -1,4 +1,4 @@
-import type { QaBenchJobDto, QaSerialLine } from "@stepwhere/types";
+import type { QaAttentionDto, QaBenchJobDto, QaSerialLine } from "@stepwhere/types";
 
 import { adminRealtimeRegistry } from "../admin/admin-realtime.service";
 
@@ -23,4 +23,9 @@ export function broadcastSerialData(stationId: string, path: string, lines: QaSe
 
 export function broadcastSerialError(stationId: string, path: string, message: string) {
   adminRealtimeRegistry.broadcast({ type: "admin:qa.serial.error", data: { stationId, path, message } });
+}
+
+/** Tells every open admin that something on the bench needs a person (a toast and a sound). */
+export function broadcastAttention(attention: QaAttentionDto) {
+  adminRealtimeRegistry.broadcast({ type: "admin:qa.attention", data: attention });
 }

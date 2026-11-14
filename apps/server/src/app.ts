@@ -33,6 +33,7 @@ import { plansRoutes } from "./modules/plans/plans.routes";
 import { placesRoutes } from "./modules/places/places.routes";
 import { pushRoutes } from "./modules/push/push.routes";
 import { qaAgentRoutes } from "./modules/qa-bench/qa-agent.routes";
+import { qaCiRoutes } from "./modules/qa-bench/qa-ci.routes";
 import { qaBenchAdminRoutes } from "./modules/qa-bench/qa-bench-admin.routes";
 import { qaUnitsAdminRoutes } from "./modules/qa-units/qa-units-admin.routes";
 import { realtimeRoutes } from "./modules/realtime/realtime.routes";
@@ -136,6 +137,7 @@ v1App.route("/", publicSharesRoutes);
 v1App.route("/", publicFamilyRoutes);
 v1App.route("/", realtimeRoutes);
 v1App.route("/", qaAgentRoutes);
+v1App.route("/", qaCiRoutes);
 v1App.route("/", adminRealtimeRoutes);
 // Public first-run setup; registered before adminV1App's /admin/* auth guards.
 v1App.route("/", adminSetupRoutes);

@@ -69,6 +69,7 @@ function toStationDto(row: StationRow, activeJobIds: string[]): QaStationDto {
       : [],
     activeJobId: activeJobIds[0] ?? null,
     activeJobIds,
+    automationEnabled: row.automationEnabled,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -168,6 +169,23 @@ export async function createStation(name: string, userId: string): Promise<QaSta
     serverUrl: resolveAgentServerUrl(),
     agentDownloadUrl: env.QA_AGENT_DOWNLOAD_URL ?? null,
   };
+}
+
+/** Turns bench automation on or off for one station. */
+export async function setStationAutomation(stationId: string, enabled: boolean) {
+  const [row] = await db
+    .update(qaStations)
+    .set({ automationEnabled: enabled, updatedAt: new Date() })
+    .where(and(eq(qaStations.id, stationId), isNull(qaStations.revokedAt)))
+    .returning();
+
+  if (!row) {
+    throw notFound("NOT_FOUND", "Station not found.");
+  }
+
+  broadcastStationChanged(row.id, "automation");
+
+  return getStationDto(row.id);
 }
 
 export async function renameStation(stationId: string, name: string) {
@@ -386,7 +404,32 @@ export async function listFirmwareUploads(limit: number) {
   return rows.map(toFirmwareDto);
 }
 
-export async function createFirmwareUpload(input: CreateQaFirmwareUploadInput, userId: string) {
+/**
+ * Firmware from CI: the same upload, without a user, and skipped when the same
+ * image (same SHA-256 and channel) is already on the bench.
+ */
+export async function createCiFirmwareUpload(input: CreateQaFirmwareUploadInput) {
+  const firmware = validateFirmwareUpload(input);
+  const [existing] = await db
+    .select({ id: qaFirmwareUploads.id })
+    .from(qaFirmwareUploads)
+    .where(and(eq(qaFirmwareUploads.sha256, firmware.sha256), eq(qaFirmwareUploads.channel, input.channel)))
+    .orderBy(desc(qaFirmwareUploads.createdAt))
+    .limit(1);
+
+  if (existing) {
+    const dto = await loadFirmwareDto(existing.id);
+
+    if (dto) {
+      return { created: false, firmware: dto };
+    }
+  }
+
+  return { created: true, firmware: await createFirmwareUpload(input, null) };
+}
+
+/** `userId` is null for uploads from CI. */
+export async function createFirmwareUpload(input: CreateQaFirmwareUploadInput, userId: string | null) {
   const firmware = validateFirmwareUpload(input);
   const [row] = await db
     .insert(qaFirmwareUploads)
@@ -574,7 +617,8 @@ export async function listJobsForUnit(unitId: string, limit: number) {
   return rows.map((row) => toJobDto(row.job, row.firmware, row.requestedByName));
 }
 
-export async function createJob(stationId: string, input: CreateQaBenchJobInput, userId: string) {
+/** `userId` is null for jobs that bench automation starts. */
+export async function createJob(stationId: string, input: CreateQaBenchJobInput, userId: string | null) {
   const station = await requireStationRow(stationId);
 
   if (!qaBenchRegistry.isOnline(station.id)) {

@@ -16,6 +16,8 @@ const envSchema = z.object({
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
   QA_AGENT_SERVER_URL: z.string().url().optional(),
   QA_AGENT_DOWNLOAD_URL: z.string().url().optional(),
+  /** Shared with GitHub Actions to upload QA firmware builds (POST /v1/qa/ci/firmware-uploads). 32+ random characters. */
+  QA_CI_UPLOAD_TOKEN: z.string().min(32).optional(),
   PUBLIC_SHARE_APP_URL: z.string().url().default("http://127.0.0.1:5175"),
   SHARE_LINK_SIGNING_SECRET: z.string().min(32),
   AWS_REGION: z.string().min(1).default("ap-south-1"),

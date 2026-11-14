@@ -96,8 +96,28 @@ export type QaUnitEventDto = {
   createdAt: string;
 };
 
+/**
+ * What a board proved over the air once it runs the production firmware: its
+ * reports reached the server over GSM, carried a step count, and located it by
+ * GPS, Wi-Fi or a cell tower. Recorded from telemetry, before the device is bound.
+ */
+export type QaFunctionalChecks = {
+  firstReportAt: string;
+  lastReportAt: string;
+  reports: number;
+  gpsFixAt: string | null;
+  wifiAt: string | null;
+  cellAt: string | null;
+  /** The step counter of the latest report. */
+  stepCounter: number | null;
+  batteryVoltageMv: number | null;
+  /** When every check had passed and the unit moved to Functional tests: passed. */
+  passedAt: string | null;
+};
+
 export type QaUnitDetailDto = QaUnitListItemDto & {
   notes: string | null;
+  functionalChecks: QaFunctionalChecks | null;
   firmware: QaFirmwareUploadDto | null;
   events: QaUnitEventDto[];
   jobs: QaBenchJobDto[];

@@ -1,4 +1,4 @@
-import { createHash, randomInt } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 
 import { QA_FIRMWARE_MAX_BYTES } from "@stepwhere/types";
 import type { QaFirmwareFormat, QaSerialLine, QaSerialPortInfo } from "@stepwhere/types";
@@ -249,4 +249,15 @@ export function serialPortKey(port: Pick<QaSerialPortInfo, "path" | "serialNumbe
   }
 
   return `path:${port.path}`;
+}
+
+/** Constant-time check of the CI upload token (both sides hashed, so lengths may differ). */
+export function ciTokenMatches(presented: string | undefined, expected: string | undefined) {
+  if (!presented || !expected) {
+    return false;
+  }
+
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+
+  return timingSafeEqual(digest(presented), digest(expected));
 }

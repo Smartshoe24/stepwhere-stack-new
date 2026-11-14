@@ -7,6 +7,7 @@ import { abortStationRuns, handleQaTtlLines } from "../qa-units/qa-tests.service
 import { handleStationSerialLines, recordBenchJobOutcome } from "../qa-units/qa-units.service";
 import { parseAgentMessage, QA_AGENT_MAX_MESSAGE_BYTES } from "./qa-agent.messages";
 import { ensureSlotPortsOpen } from "./qa-slots.service";
+import { handleAutomationJobResult, handleFlashRecorded, startQaAutomation } from "./qa-automation.service";
 import {
   broadcastJobProgress,
   createJobRuntime,
@@ -190,6 +191,7 @@ async function processAgentMessage(
     }
     case "agent.hardware": {
       connection.hardware = message.data;
+      startQaAutomation();
       broadcastStationChanged(station.id, "hardware");
       // A slot's adapter was plugged in (or the agent just connected): start listening to it.
       await ensureSlotPortsOpen(station.id);
@@ -280,6 +282,14 @@ async function processAgentMessage(
       qaBenchRegistry.forgetJob(runtime.jobId);
 
       if (dto) {
+        // Automation's own "is a board there?" checks are not recorded on the unit.
+        if (await handleAutomationJobResult(dto).catch((error) => {
+          console.error("[qa-bench] automation failed to handle a job", getSafeErrorDetails(error));
+          return false;
+        })) {
+          return;
+        }
+
         try {
           dto.unitId = await recordBenchJobOutcome(dto);
         } catch (error) {
@@ -287,6 +297,10 @@ async function processAgentMessage(
         }
 
         broadcastJobChanged(dto);
+
+        await handleFlashRecorded(dto, dto.unitId).catch((error) => {
+          console.error("[qa-bench] automation failed after a flash", getSafeErrorDetails(error));
+        });
       }
 
       return;
