@@ -16,6 +16,28 @@ import { EmptyState } from '@/components/patterns/states'
  * ship). The server looks up up to 10 Wi-Fi/GSM positions for QA firmware.
  */
 
+/** Metres between the GPS fix and the Wi-Fi/GSM position of the same upload, if both exist. */
+function distanceFromGps(entry: QaTestReportDto) {
+  if (
+    !entry.gpsFix ||
+    entry.latitude == null ||
+    entry.longitude == null ||
+    entry.networkLatitude == null ||
+    entry.networkLongitude == null
+  ) {
+    return null
+  }
+  const rad = Math.PI / 180
+  const dLat = (entry.networkLatitude - entry.latitude) * rad
+  const dLng = (entry.networkLongitude - entry.longitude) * rad
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(entry.latitude * rad) *
+      Math.cos(entry.networkLatitude * rad) *
+      Math.sin(dLng / 2) ** 2
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(a))
+}
+
 const coords = (lat: number, lng: number) =>
   `${lat.toFixed(5)}, ${lng.toFixed(5)}`
 
@@ -148,6 +170,7 @@ export function TestLogPanel({ unitId }: { unitId: string }) {
             <th>Firmware</th>
             <th>GPS</th>
             <th>Wi-Fi/GSM position</th>
+            <th>From GPS</th>
             <th>Cell</th>
             <th>Wi-Fi</th>
             <th>Battery</th>
@@ -155,7 +178,7 @@ export function TestLogPanel({ unitId }: { unitId: string }) {
         </thead>
         <tbody>
           {log.entries.length === 0 ? (
-            <EventTableEmpty colSpan={7}>No uploads yet.</EventTableEmpty>
+            <EventTableEmpty colSpan={8}>No uploads yet.</EventTableEmpty>
           ) : (
             log.entries.map((entry) => (
               <tr key={entry.id}>
@@ -180,6 +203,18 @@ export function TestLogPanel({ unitId }: { unitId: string }) {
                   )}
                 </td>
                 <td>{networkCell(entry)}</td>
+                <td className='text-xs tabular'>
+                  {(() => {
+                    const meters = distanceFromGps(entry)
+                    return meters == null ? (
+                      <span className='text-ink-4'>—</span>
+                    ) : meters >= 1000 ? (
+                      `${(meters / 1000).toFixed(1)} km`
+                    ) : (
+                      `${Math.round(meters)} m`
+                    )
+                  })()}
+                </td>
                 <td className='font-mono text-xs'>{entry.cell ?? '—'}</td>
                 <td className='text-xs tabular'>{entry.wifiCount}</td>
                 <td className='text-xs tabular'>

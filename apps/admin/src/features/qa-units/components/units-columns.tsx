@@ -5,6 +5,7 @@ import { AdminLastSeen } from '@/features/admin/components/admin-last-seen'
 import { DataTableColumnHeader } from '@/components/data-table'
 import { shortChipUid, stageLabels, unitTitle } from '../lib/qa-unit-format'
 import { FirmwareChannelTag, StageBar, UnitStatusBadge } from './stage-display'
+import { MotionIcBadge } from './motion-ic-badge'
 
 export function getUnitsColumns(): ColumnDef<QaUnitListItemDto>[] {
   return [
@@ -73,6 +74,14 @@ export function getUnitsColumns(): ColumnDef<QaUnitListItemDto>[] {
         ) : (
           <span className='text-ink-4'>—</span>
         ),
+      enableSorting: false,
+    },
+    {
+      id: 'motionIc',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title='Motion IC' />
+      ),
+      cell: ({ row }) => <MotionIcBadge motionIc={row.original.motionIc} />,
       enableSorting: false,
     },
     {
