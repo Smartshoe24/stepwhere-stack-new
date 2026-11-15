@@ -73,6 +73,7 @@ import {
   servingCellKey,
   shouldLookupEveryCellObservation,
   shouldLookupForChangedNetwork,
+  TEST_DEVICE_CELL_LOOKUP_INTERVALS,
   wifiLookupKeys,
   type CellLookupIntervals,
   type CellLookupMode,
@@ -598,7 +599,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
   const gpsConnected = input.gpsFixValid === undefined
     ? !(input.latitude === 0 && input.longitude === 0)
     : input.gpsFixValid && (input.satelliteCount ?? 0) >= 3;
-  const cellLookupIntervals = getCellLookupIntervals(input.simulation, env.NODE_ENV);
+  const cellLookupIntervals = env.NETWORK_LOOKUP_TEST_DEVICES.has(hardwareIdentifier)
+    ? TEST_DEVICE_CELL_LOOKUP_INTERVALS
+    : getCellLookupIntervals(input.simulation, env.NODE_ENV);
   const lookupEveryObservation = shouldLookupEveryCellObservation({
     nodeEnv: env.NODE_ENV,
     simulation: input.simulation,

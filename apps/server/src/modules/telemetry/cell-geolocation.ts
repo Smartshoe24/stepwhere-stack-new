@@ -62,6 +62,14 @@ export function getCellLookupIntervals(
   };
 }
 
+// Bench test devices (NETWORK_LOOKUP_TEST_DEVICES): the usual 2-minute first
+// lookup, then every 30 s whether or not anything changed.
+export const TEST_DEVICE_CELL_LOOKUP_INTERVALS: CellLookupIntervals = {
+  initialDelayMs: CELL_INITIAL_DELAY_MS,
+  normalIntervalMs: NETWORK_CHANGE_MIN_INTERVAL_MS,
+  fastIntervalMs: NETWORK_CHANGE_MIN_INTERVAL_MS,
+};
+
 export function getInitialCellLookupAt(
   outageStartedAt: Date,
   intervals = DEFAULT_CELL_LOOKUP_INTERVALS,
