@@ -5,7 +5,7 @@ import type { QaBoardTestId, QaFirmwareFormat, QaUnitStage, QaUnitStageStatus } 
  * (a busy cell, a slow registration). Automation retries each of these once
  * before a board counts as failed. Hardware tests are never retried.
  */
-export const QA_AUTOMATION_RETRYABLE_TESTS: readonly QaBoardTestId[] = ["sim", "gsm", "wifi", "cell", "data"];
+export const QA_AUTOMATION_RETRYABLE_TESTS: readonly QaBoardTestId[] = ["sim", "gsm", "wifi", "cell", "data", "netloc"];
 
 /** A board sitting on a slot, as automation sees it after identifying it. */
 export type SlotBoard = {

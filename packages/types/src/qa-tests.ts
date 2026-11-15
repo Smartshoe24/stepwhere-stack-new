@@ -25,6 +25,7 @@ export const QA_BOARD_TEST_IDS = [
   "data",
   "steps",
   "gps",
+  "netloc",
 ] as const;
 
 export type QaBoardTestId = (typeof QA_BOARD_TEST_IDS)[number];
@@ -59,6 +60,10 @@ export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description:
   gps: {
     label: "GPS",
     description: "Valid NMEA arrives within 5 s of power-on. A fix and satellites in view are reported as information.",
+  },
+  netloc: {
+    label: "Wi-Fi/GSM upload",
+    description: "10 location uploads with Wi-Fi and the serving cell, 30 s apart; at least 8 accepted by the server. The Wi-Fi/GSM positions the server looks up are in the unit's test log.",
   },
 };
 

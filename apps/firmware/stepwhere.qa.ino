@@ -24,6 +24,11 @@
  * pedometer in src/pedometer.h; a LIS2DS12 (0x43 at 0x1D or 0x1E) uses its
  * hardware step counter on INT2.
  *
+ * netloc (last, about 5 min): 10 location uploads to ingest.stepwhere.in, 30 s
+ * apart, with Wi-Fi and the serving cell and a "qa" block (chip UID, version).
+ * The server stores them in the unit's test log and looks up up to 10 Wi-Fi/GSM
+ * positions (apps/server/src/modules/qa-units/qa-test-log.service.ts).
+ *
  * Console commands: QA RUN, QA RUN <test>, QA GO, QA ABORT, QA STATUS, QA HELP.
  * The step test waits for QA GO (the Start button in admin), so on a bench of
  * 30 boards each one is walked when the operator gets to it.
@@ -35,12 +40,14 @@
 #include <TinyGPSPlus.h>
 #include <Wire.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "src/pedometer.h"
+#include "src/radio_parsers.h"
 
-#define QA_FW_VERSION "qa-0.6.0"
+#define QA_FW_VERSION "qa-0.7.0"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -79,6 +86,18 @@ constexpr uint8_t SELFTEST_SAMPLES = 5;
 constexpr uint32_t SELFTEST_SETTLE_MS = 90;          // > 4 samples at 50 Hz after a change
 constexpr uint32_t SELFTEST_SAMPLE_TIMEOUT_MS = 100;  // one sample is 20 ms at 50 Hz
 constexpr uint16_t WIFI_MIN_APS = 1;
+// netloc: the board sends location uploads to the server like the production
+// firmware does, so a QA run proves board -> modem -> server -> Wi-Fi/cell
+// lookup. The server answers 201 and makes the lookups (at most 10 a board).
+constexpr uint8_t NETLOC_UPLOADS = 10;
+constexpr uint32_t NETLOC_INTERVAL_MS = 30000;
+constexpr uint8_t NETLOC_MIN_ACCEPTED = 8;
+constexpr uint8_t NETLOC_MAX_APS = 8;       // keeps the upload well under 2 KB
+#ifndef QA_INGEST_URL
+#define QA_INGEST_URL "http://ingest.stepwhere.in/location"
+#endif
+constexpr uint32_t HTTP_SETUP_TIMEOUT_MS = 15000;
+constexpr uint32_t HTTP_RESPONSE_TIMEOUT_MS = 30000;
 constexpr int32_t ACCEL_MIN_MG = 700;               // at rest the board reads about 1 g
 constexpr int32_t ACCEL_MAX_MG = 1300;
 
@@ -175,10 +194,10 @@ TinyGPSCustom gsvBeidouGb(gps, "GBGSV", 3);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 // Same order as QA_BOARD_TEST_IDS in packages/types/src/qa-tests.ts.
-enum TestId : uint8_t { T_POWER, T_IMU, T_FLASH, T_MODEM, T_SIM, T_GSM, T_WIFI, T_CELL, T_DATA, T_STEPS, T_GPS, TEST_COUNT };
+enum TestId : uint8_t { T_POWER, T_IMU, T_FLASH, T_MODEM, T_SIM, T_GSM, T_WIFI, T_CELL, T_DATA, T_STEPS, T_GPS, T_NETLOC, TEST_COUNT };
 
 const char *const TEST_NAMES[TEST_COUNT] = {
-  "power", "imu", "flash", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps",
+  "power", "imu", "flash", "modem", "sim", "gsm", "wifi", "cell", "data", "steps", "gps", "netloc",
 };
 
 // Running one test also runs what it needs first.
@@ -194,6 +213,7 @@ const uint16_t TEST_NEEDS[TEST_COUNT] = {
   (1 << T_POWER) | (1 << T_MODEM) | (1 << T_SIM) | (1 << T_GSM),  // data
   (1 << T_IMU),                                            // steps
   (1 << T_POWER),                                          // gps
+  (1 << T_POWER) | (1 << T_MODEM) | (1 << T_SIM) | (1 << T_GSM) | (1 << T_DATA),  // netloc
 };
 
 enum class Outcome : uint8_t { None, Pass, Fail, Skip };
@@ -1560,6 +1580,222 @@ void test_gps() {
   line.end();
 }
 
+// ─── Location uploads (netloc) ───────────────────────────────────────────────
+
+/**
+ * Sends `command` (unless empty) and reads the modem until `expect` appears,
+ * also matching a prompt without a line end such as ">". The bytes read are
+ * kept in `capture` when given. ERROR or +CME ERROR ends the wait early.
+ */
+At at_expect(const char *command, const char *expect, uint32_t timeoutMs, char *capture = nullptr,
+             size_t captureLength = 0) {
+  char window[256];
+  size_t used = 0;
+  size_t captured = 0;
+  if (capture && captureLength) capture[0] = '\0';
+  if (command[0]) {
+    while (SerialGSM.available()) SerialGSM.read();
+    SerialDBG.print("[AT] >> ");
+    SerialDBG.println(command);
+    SerialGSM.print(command);
+    SerialGSM.print("\r\n");
+  }
+  const uint32_t startedAt = millis();
+  while (millis() - startedAt < timeoutMs) {
+    while (SerialGSM.available()) {
+      const char c = (char)SerialGSM.read();
+      if (capture && captured + 1 < captureLength) {
+        capture[captured++] = c;
+        capture[captured] = '\0';
+      }
+      if (used + 1 >= sizeof(window)) {  // keep the newest half
+        memmove(window, window + sizeof(window) / 2, used - sizeof(window) / 2);
+        used -= sizeof(window) / 2;
+      }
+      window[used++] = c;
+      window[used] = '\0';
+      if (strstr(window, expect)) return At::Ok;
+      if (strstr(window, "\nERROR") || strstr(window, "+CME ERROR")) {
+        SerialDBG.print("[AT] << ERROR after ");
+        SerialDBG.println(command[0] ? command : "(data)");
+        return At::Error;
+      }
+    }
+    service();
+    delay(1);
+  }
+  SerialDBG.print("[AT] TIMEOUT waiting for ");
+  SerialDBG.println(expect);
+  return At::Timeout;
+}
+
+/** The last "HTTP/1.x NNN" status in a modem reply, 0 if none. */
+int http_status(const char *reply) {
+  int code = 0;
+  for (const char *at = strstr(reply, "HTTP/1."); at; at = strstr(at + 1, "HTTP/1.")) {
+    const char *space = strchr(at, ' ');
+    if (!space) break;
+    const int parsed = atoi(space + 1);
+    if (parsed >= 200 && parsed <= 599) code = parsed;
+  }
+  return code;
+}
+
+/** POSTs one JSON upload over the modem's HTTP stack, as stepwhere.ino does. Returns the HTTP status, 0 on failure. */
+int http_post_json(const char *payload) {
+  char command[96];
+  if (at_expect("AT+HTTPPARA=url,\"" QA_INGEST_URL "\"", "OK", AT_TIMEOUT_MS) != At::Ok) return 0;
+  if (at_expect("AT+HTTPPARA=port,80", "OK", AT_TIMEOUT_MS) != At::Ok) return 0;
+  if (at_expect("AT+HTTPSETUP", "OK", HTTP_SETUP_TIMEOUT_MS) != At::Ok) {
+    at_expect("AT+HTTPCLOSE", "OK", AT_TIMEOUT_MS);
+    return 0;
+  }
+  snprintf(command, sizeof(command), "AT+HTTPACTION=2,%u,2", (unsigned)strlen(payload));
+  if (at_expect(command, ">", HTTP_SETUP_TIMEOUT_MS) != At::Ok) {
+    at_expect("AT+HTTPCLOSE", "OK", AT_TIMEOUT_MS);
+    return 0;
+  }
+  SerialGSM.print(payload);
+  char reply[512];
+  int status = 0;
+  if (at_expect("", "+HTTPRECV:", HTTP_RESPONSE_TIMEOUT_MS) == At::Ok) {
+    at_expect("", "+HTTPCLOSED:", 5000, reply, sizeof(reply));
+    status = http_status(reply);
+  }
+  at_expect("AT+HTTPCLOSE", "OK", AT_TIMEOUT_MS);
+  return status;
+}
+
+/** Appends printf-style text to `buffer`; false once it would overflow. */
+bool append(char *buffer, size_t size, size_t &used, const char *format, ...) {
+  if (used >= size) return false;
+  va_list args;
+  va_start(args, format);
+  const int written = vsnprintf(buffer + used, size - used, format, args);
+  va_end(args);
+  if (written < 0 || used + (size_t)written >= size) {
+    used = size;
+    return false;
+  }
+  used += (size_t)written;
+  return true;
+}
+
+/**
+ * One upload in the shape the server takes from the production firmware, plus
+ * the "qa" block (chip UID and QA firmware version) that marks it as a QA run.
+ */
+bool build_netloc_payload(char *out, size_t size, const ServingCell &cell, const stepwhere::WifiScanResult &wifi,
+                          uint8_t &wifiSent) {
+  size_t used = 0;
+  const uint32_t satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
+  const bool fix = gps.location.isValid() && gps.location.age() < 2000 && satellites >= GPS_MIN_SATELLITES;
+  append(out, size, used, "{\"hardwareIdentifier\":\"%s\",\"latitude\":", run.imei);
+  if (fix) {
+    char lat[16], lng[16];
+    dtostrf(gps.location.lat(), 0, 6, lat);
+    dtostrf(gps.location.lng(), 0, 6, lng);
+    append(out, size, used, "%s,\"longitude\":%s,\"gpsFixValid\":true", lat, lng);
+  } else {
+    append(out, size, used, "0,\"longitude\":0,\"gpsFixValid\":false");
+  }
+  append(out, size, used, ",\"satelliteCount\":%lu,\"batteryVoltageMv\":%lu,\"stepCounter\":%lu,\"deviceState\":\"active\"",
+         (unsigned long)satellites, (unsigned long)battery_mv(), (unsigned long)steps_now());
+  if (cell.valid) {
+    append(out, size, used,
+           ",\"cellular\":{\"radioType\":\"lte\",\"duplexMode\":\"%s\",\"towers\":[{\"role\":\"serving\","
+           "\"mobileCountryCode\":%u,\"mobileNetworkCode\":%u,\"trackingAreaCode\":%u,\"cellId\":%lu",
+           cell.duplex, cell.mcc, cell.mnc, cell.tac, (unsigned long)cell.cellId);
+    if (cell.hasPci) append(out, size, used, ",\"physicalCellId\":%u", cell.pci);
+    if (cell.hasRsrp) append(out, size, used, ",\"rsrpDbm\":%d", cell.rsrpTenthsDbm / 10);
+    append(out, size, used, "}]}");
+  }
+  wifiSent = 0;
+  if (wifi.count > 0) {
+    append(out, size, used, ",\"wifi\":{\"accessPoints\":[");
+    // Strongest first, at most NETLOC_MAX_APS.
+    bool taken[stepwhere::kMaxWifiAccessPoints] = {};
+    while (wifiSent < wifi.count && wifiSent < NETLOC_MAX_APS) {
+      int8_t best = -1;
+      for (uint8_t i = 0; i < wifi.count; i++) {
+        if (!taken[i] && (best < 0 || wifi.points[i].rssi > wifi.points[best].rssi)) best = (int8_t)i;
+      }
+      taken[best] = true;
+      const stepwhere::WifiAccessPoint &ap = wifi.points[best];
+      append(out, size, used, "%s{\"macAddress\":\"%s\",\"signalStrengthDbm\":%d,\"channel\":%u,\"ageMs\":%lu}",
+             wifiSent ? "," : "", ap.mac, ap.rssi, ap.channel, (unsigned long)(millis() - ap.observed_at_ms));
+      wifiSent++;
+    }
+    append(out, size, used, "]}");
+  }
+  append(out, size, used, ",\"qa\":{\"uid\":\"%s\",\"fw\":\"" QA_FW_VERSION "\"}}", chipUid);
+  return used < size;
+}
+
+/**
+ * netloc: NETLOC_UPLOADS location uploads, NETLOC_INTERVAL_MS apart, each with
+ * a fresh Wi-Fi scan and serving cell. Passes when the server accepted (201)
+ * at least NETLOC_MIN_ACCEPTED. The Wi-Fi/GSM positions the server looks up
+ * are shown on the unit in admin (test log), not decided here.
+ */
+void test_netloc() {
+  report_running(T_NETLOC);
+  const uint32_t startedAt = millis();
+  uint8_t sent = 0, accepted = 0, withWifi = 0, withCell = 0;
+  int lastStatus = 0;
+  static char payload[1600];
+  static stepwhere::WifiScanResult wifi;
+  for (uint8_t i = 0; i < NETLOC_UPLOADS && !aborted(); i++) {
+    const uint32_t due = startedAt + (uint32_t)i * NETLOC_INTERVAL_MS;
+    while ((int32_t)(millis() - due) < 0 && !aborted()) wait_ms(50);
+    if (aborted()) break;
+
+    // Wi-Fi first: the scan returns ERROR while LTE is busy, and the link has been quiet since the last upload.
+    wifi.clear();
+    char reply[1024];
+    if (at("AT+WIFIAPSCAN", WIFI_SCAN_TIMEOUT_MS, reply, sizeof(reply)) == At::Ok) {
+      for (char *line = strtok(reply, "\n"); line; line = strtok(nullptr, "\n")) {
+        stepwhere::parse_wifi_ap_line(line, wifi, millis());
+      }
+    }
+    ServingCell cell;
+    const char *cellError = nullptr;
+    if (at("AT+NETDMSG", AT_TIMEOUT_MS, reply, sizeof(reply)) != At::Ok || !parse_netdmsg(reply, cell, cellError)) {
+      cell = ServingCell{};
+    }
+
+    uint8_t wifiSent = 0;
+    if (!build_netloc_payload(payload, sizeof(payload), cell, wifi, wifiSent)) {
+      SerialDBG.println("[QA] netloc: upload too large, skipped");
+      continue;
+    }
+    lastStatus = http_post_json(payload);
+    sent++;
+    if (lastStatus == 201) accepted++;
+    if (wifiSent) withWifi++;
+    if (cell.valid) withCell++;
+
+    char text[80];
+    snprintf(text, sizeof(text), "Upload %u/%u · HTTP %d · %u Wi-Fi · %s", (unsigned)(i + 1), (unsigned)NETLOC_UPLOADS,
+             lastStatus, (unsigned)wifiSent, cell.valid ? "cell" : "no cell");
+    report_progress(T_NETLOC, text);
+  }
+
+  const uint32_t ms = millis() - startedAt;
+  if (aborted() && sent < NETLOC_UPLOADS) {
+    result_line(T_NETLOC, Outcome::Skip, ms, "Aborted").end();
+    return;
+  }
+  const bool ok = accepted >= NETLOC_MIN_ACCEPTED;
+  static char error[96];
+  snprintf(error, sizeof(error), "Only %u of %u uploads accepted by the server (last HTTP %d): data link, APN or server",
+           (unsigned)accepted, (unsigned)NETLOC_UPLOADS, lastStatus);
+  result_line(T_NETLOC, ok ? Outcome::Pass : Outcome::Fail, ms, ok ? nullptr : error)
+    .data().unum("sent", sent).unum("accepted", accepted).unum("minAccepted", NETLOC_MIN_ACCEPTED)
+    .unum("withWifi", withWifi).unum("withCell", withCell).num("lastStatus", lastStatus)
+    .unum("intervalMs", NETLOC_INTERVAL_MS).end();
+}
+
 // ─── Run ──────────────────────────────────────────────────────────────────────
 
 uint16_t with_needs(uint16_t tests) {
@@ -1649,6 +1885,12 @@ void run_tests(uint16_t requested) {
     if (aborted()) skip(T_GPS, "Aborted");
     else if (!powerOk) skip(T_GPS, "Battery too low");
     else test_gps();
+  }
+  // Last: it takes about 5 minutes, and by now GPS may have a fix to send along.
+  if (selected(T_NETLOC)) {
+    if (aborted()) skip(T_NETLOC, "Aborted");
+    else if (!passed(T_DATA)) skip(T_NETLOC, "No data connection");
+    else test_netloc();
   }
 
   uint8_t passedCount = 0, failedCount = 0, skippedCount = 0;
