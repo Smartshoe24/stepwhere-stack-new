@@ -48,6 +48,9 @@ import {
   type StagePreset,
 } from './components/unit-dialogs'
 import { TestChecklist } from './components/test-checklist'
+import { TestLogPanel } from './components/test-log-panel'
+import { MotionIcBadge } from './components/motion-ic-badge'
+import { FinalTestStepsPanel } from './components/final-test-steps-panel'
 import { runStatusLabel, runStatusTone } from './lib/qa-test-format'
 import {
   formatChipUid,
@@ -252,6 +255,7 @@ export function QaUnitDetailPage() {
                       {unit.jobs.length}
                     </span>
                   </TabsTrigger>
+                  <TabsTrigger value='test-log'>Test log</TabsTrigger>
                 </TabsList>
                 <TabsContent value='timeline'>
                   <Panel>
@@ -261,6 +265,9 @@ export function QaUnitDetailPage() {
                 </TabsContent>
                 <TabsContent value='tests'>
                   <TestRuns runs={unit.testRuns} />
+                </TabsContent>
+                <TabsContent value='test-log'>
+                  <TestLogPanel unitId={unit.id} />
                 </TabsContent>
                 <TabsContent value='jobs'>
                   <Panel>
@@ -299,6 +306,10 @@ export function QaUnitDetailPage() {
                       }
                     />
                     <KeyValue
+                      label='Motion IC'
+                      value={<MotionIcBadge motionIc={unit.motionIc} showDetail />}
+                    />
+                    <KeyValue
                       label='Customer binding'
                       value={
                         unit.device ? (
@@ -313,6 +324,7 @@ export function QaUnitDetailPage() {
                   </KeyValueList>
                 </Panel>
                 <FunctionalChecksPanel unit={unit} />
+                <FinalTestStepsPanel unit={unit} />
                 <Panel title='Where it is'>
                   <KeyValueList>
                     <KeyValue label='Station' value={unit.lastStationName} />
