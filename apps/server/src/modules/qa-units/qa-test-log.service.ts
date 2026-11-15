@@ -10,7 +10,7 @@
  *   list, and to the QA list when the upload carries its chip UID.
  * - QA firmware uploads get up to 10 Wi-Fi/cell lookups, 30 s apart.
  */
-import { and, count, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import type { LocationTelemetryInput, QaTestLogDto, QaTestReportDto } from "@stepwhere/types";
 
 import { env } from "../../config/env";
@@ -33,6 +33,7 @@ import {
   reportFirmware,
 } from "./qa-test-log.helpers";
 import { reportHasGpsFix } from "./qa-functional.helpers";
+import { finalTestSteps } from "./qa-motion.helpers";
 import { broadcastUnitChanged } from "./qa-units.realtime";
 import { normalizeImei, shortChipUid } from "./qa-units.helpers";
 import { addEvent, ensureDeviceForImei } from "./qa-units.service";
@@ -225,12 +226,22 @@ export async function getTestLog(unitId: string, limit: number): Promise<QaTestL
     db.select({ n: count() }).from(qaUnitReports).where(eq(qaUnitReports.unitId, unitId)),
   ]);
 
+  const finalCounters = await db
+    .select({ stepCounter: qaUnitReports.stepCounter })
+    .from(qaUnitReports)
+    .where(and(eq(qaUnitReports.unitId, unitId), eq(qaUnitReports.stage, "final_test")))
+    .orderBy(asc(qaUnitReports.receivedAt))
+    .limit(2000);
+
   return {
     unitId,
     networkLookups: unit.networkLookups,
     networkLookupMax: QA_NETWORK_LOOKUP_MAX,
     networkLocatedAt: unit.networkLocatedAt?.toISOString() ?? null,
     total: total?.n ?? 0,
+    finalTestSteps: finalTestSteps(
+      finalCounters.map((row) => row.stepCounter).filter((value): value is number => value != null),
+    ),
     entries: rows.map((row): QaTestReportDto => ({
       id: row.id,
       receivedAt: row.receivedAt.toISOString(),
