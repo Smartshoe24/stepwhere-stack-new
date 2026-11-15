@@ -47,7 +47,7 @@
 #include "src/pedometer.h"
 #include "src/radio_parsers.h"
 
-#define QA_FW_VERSION "qa-0.7.0"
+#define QA_FW_VERSION "qa-0.7.1"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -230,6 +230,7 @@ struct RunState {
   uint32_t ldoOnAt = 0;       // GPS power-on
   uint32_t pwrkeyAt = 0;      // modem power-on
   bool modemReady = false;
+  bool batteryLow = false;   // a valid reading below BATTERY_MIN_MV: radios stay off
   bool registered = false;
   char imei[16] = "";
 } run;
@@ -853,6 +854,11 @@ void test_power() {
   else if (b.mv < BATTERY_MIN_MV) error = "Battery below the modem cut-off; charge it";
   else if (b.vddaMv < VDDA_MIN_MV || b.vddaMv > VDDA_MAX_MV) error = "MCU supply (VDDA) out of range; check the 3.3 V regulator";
   else if (charge == ChargeState::Invalid) error = "Charger CHRG (PB14) and STDBY (PB15) both low; check the charger IC";
+
+  // Only a battery that really reads low keeps the modem and GPS off. A broken
+  // reading (saturated ADC, divider fault) fails this test, but the radio tests
+  // still run: they show whether the board works apart from its battery sensing.
+  run.batteryLow = b.vddaMv != 0 && b.raw < ADC_SATURATED_RAW && b.mv < BATTERY_MIN_MV;
 
   result_line(T_POWER, error ? Outcome::Fail : Outcome::Pass, 0, error)
     .data().unum("mv", b.mv).unum("minMv", BATTERY_MIN_MV).unum("maxMv", BATTERY_MAX_MV)
@@ -1814,6 +1820,7 @@ void run_tests(uint16_t requested) {
   run.startedAt = millis();
   run.modemReady = false;
   run.registered = false;
+  run.batteryLow = false;
   run.imei[0] = '\0';
   for (uint8_t i = 0; i < TEST_COUNT; i++) run.outcome[i] = Outcome::None;
 
@@ -1842,7 +1849,7 @@ void run_tests(uint16_t requested) {
   if (selected(T_IMU)) test_imu();
   if (selected(T_FLASH)) test_flash();
 
-  const bool powerOk = !selected(T_POWER) || passed(T_POWER);
+  const bool powerOk = !run.batteryLow;
   if (radios && powerOk && !aborted()) power_cycle_radios();
 
   // Each test runs only when what it needs passed; otherwise it is skipped with the reason.
