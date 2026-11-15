@@ -15,6 +15,7 @@ import {
   updateUnit,
 } from "./qa-units.service";
 import { getLatestStationRun } from "./qa-test-runs.query";
+import { getTestLog } from "./qa-test-log.service";
 
 const TAGS = ["Admin QA"];
 
@@ -39,6 +40,7 @@ const stageInput = z.object({
   note: z.string().trim().max(500).nullable().optional(),
 });
 const noteInput = z.object({ note: z.string().trim().min(1).max(2000) });
+const testLogQuery = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
 
 const json = <T extends z.ZodType>(schema: T) => ({
   required: true as const,
@@ -82,6 +84,21 @@ qaUnitsAdminRoutes.openapi(
     responses: { 200: dto("Unit with its timeline and bench jobs."), ...adminErrors },
   }),
   async (c) => ok(c, await getUnitDetail(c.req.valid("param").unitId)),
+);
+
+qaUnitsAdminRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/admin/qa/units/{unitId}/test-log",
+    tags: TAGS,
+    security: bearerSecurity,
+    request: { params: unitParams, query: testLogQuery },
+    responses: {
+      200: dto("Location uploads the board sent while in QA and not bound to a child, newest first."),
+      ...adminErrors,
+    },
+  }),
+  async (c) => ok(c, await getTestLog(c.req.valid("param").unitId, c.req.valid("query").limit)),
 );
 
 qaUnitsAdminRoutes.openapi(

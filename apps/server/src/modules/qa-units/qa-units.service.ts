@@ -511,7 +511,7 @@ export async function handleStationSerialLines(stationId: string, path: string, 
 type LinkContext = { source: "ttl" | "manual"; stationId: string | null; actorUserId: string | null };
 
 /** The devices row for an IMEI, created as a fresh embedded device when missing. */
-async function ensureDeviceForImei(executor: Executor, imei: string) {
+export async function ensureDeviceForImei(executor: Executor, imei: string) {
   const [existing] = await executor
     .select({ id: devices.id })
     .from(devices)

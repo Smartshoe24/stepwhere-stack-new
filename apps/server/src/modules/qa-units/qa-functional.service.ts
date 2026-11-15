@@ -8,8 +8,9 @@
  * - steps: it carried the motion sensor's step count;
  * - location: GPS, or the Wi-Fi / cell-tower fallback, located it.
  *
- * When all three are seen, the unit moves to Functional tests: passed. The
- * device still gets the same 404 as before, so the firmware behaves as it did.
+ * When all three are seen, the unit moves to Functional tests: passed. While
+ * the unit is before Ready to ship the upload also goes to its test log and
+ * the device gets 201 (qa-test-log.service.ts); after that, the usual 404.
  */
 import { eq } from "drizzle-orm";
 import type { LocationTelemetryInput } from "@stepwhere/types";
@@ -23,6 +24,8 @@ import { applyFunctionalReport, functionalVerdict, QA_FUNCTIONAL_STAGES } from "
 import { broadcastUnitChanged } from "./qa-units.realtime";
 import { normalizeImei } from "./qa-units.helpers";
 import { addEvent } from "./qa-units.service";
+import { QaTestReportAccepted } from "./qa-test-log.helpers";
+import { recordTestReport } from "./qa-test-log.service";
 
 /** Records one location report as functional-test evidence, if it comes from a QA unit that is due for it. */
 export async function recordFunctionalReport(hardwareIdentifier: string, input: LocationTelemetryInput) {
@@ -121,9 +124,18 @@ export async function withQaFunctionalEvidence<T>(hardwareIdentifier: string, in
     return await ingest();
   } catch (error) {
     if (error instanceof AppError && error.status === 404) {
+      // Test log first: it may register a never-seen board, which the
+      // functional checks below then find by IMEI.
+      const unitId = await recordTestReport(hardwareIdentifier, input).catch((recordError) => {
+        console.error("[qa-test-log] could not record a report", getSafeErrorDetails(recordError));
+        return null;
+      });
       await recordFunctionalReport(hardwareIdentifier, input).catch((recordError) => {
         console.error("[qa-functional] could not record a report", getSafeErrorDetails(recordError));
       });
+      if (unitId) {
+        throw new QaTestReportAccepted(unitId);
+      }
     }
 
     throw error;

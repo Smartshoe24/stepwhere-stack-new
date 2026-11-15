@@ -115,6 +115,42 @@ export type QaFunctionalChecks = {
   passedAt: string | null;
 };
 
+/** One location upload from a board in QA that is not bound to a child. */
+export type QaTestReportDto = {
+  id: string;
+  receivedAt: string;
+  firmware: string | null;
+  stage: QaUnitStage;
+  gpsFix: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  satelliteCount: number | null;
+  /** Serving cell "mcc-mnc-tac-cellId". */
+  cell: string | null;
+  towerCount: number;
+  wifiCount: number;
+  batteryVoltageMv: number | null;
+  stepCounter: number | null;
+  /** True when a Wi-Fi/cell lookup was made for this upload. */
+  networkLookup: boolean;
+  networkLatitude: number | null;
+  networkLongitude: number | null;
+  networkAccuracyMeters: number | null;
+  networkError: string | null;
+};
+
+export type QaTestLogDto = {
+  unitId: string;
+  /** Wi-Fi/cell lookups made so far and the most a board gets. */
+  networkLookups: number;
+  networkLookupMax: number;
+  /** When a lookup first returned a position ("Wi-Fi/GSM location" passed). */
+  networkLocatedAt: string | null;
+  total: number;
+  /** Newest first. */
+  entries: QaTestReportDto[];
+};
+
 export type QaUnitDetailDto = QaUnitListItemDto & {
   notes: string | null;
   functionalChecks: QaFunctionalChecks | null;
