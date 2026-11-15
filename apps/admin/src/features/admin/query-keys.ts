@@ -25,6 +25,8 @@ export const adminQueryKeys = {
     unitList: (query: QaUnitsListQuery) =>
       ['admin', 'qa', 'units', 'list', query] as const,
     unit: (unitId: string) => ['admin', 'qa', 'units', 'detail', unitId] as const,
+    // Under 'units', so admin:qa.unit.changed refreshes it with the unit.
+    unitTestLog: (unitId: string) => ['admin', 'qa', 'units', 'test-log', unitId] as const,
     stationUnit: (stationId: string) =>
       ['admin', 'qa', 'station-unit', stationId] as const,
     stationTestRun: (stationId: string) =>

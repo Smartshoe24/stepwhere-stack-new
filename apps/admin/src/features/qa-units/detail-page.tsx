@@ -48,6 +48,7 @@ import {
   type StagePreset,
 } from './components/unit-dialogs'
 import { TestChecklist } from './components/test-checklist'
+import { TestLogPanel } from './components/test-log-panel'
 import { runStatusLabel, runStatusTone } from './lib/qa-test-format'
 import {
   formatChipUid,
@@ -252,6 +253,7 @@ export function QaUnitDetailPage() {
                       {unit.jobs.length}
                     </span>
                   </TabsTrigger>
+                  <TabsTrigger value='test-log'>Test log</TabsTrigger>
                 </TabsList>
                 <TabsContent value='timeline'>
                   <Panel>
@@ -261,6 +263,9 @@ export function QaUnitDetailPage() {
                 </TabsContent>
                 <TabsContent value='tests'>
                   <TestRuns runs={unit.testRuns} />
+                </TabsContent>
+                <TabsContent value='test-log'>
+                  <TestLogPanel unitId={unit.id} />
                 </TabsContent>
                 <TabsContent value='jobs'>
                   <Panel>
