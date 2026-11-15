@@ -73,6 +73,7 @@ import type {
   QaStationUnitDto,
   QaStationTestRunDto,
   QaUnitDetailDto,
+  QaTestLogDto,
   QaUnitListResponseDto,
   QaUnitsListQuery,
   SetQaUnitStageInput,
@@ -759,6 +760,11 @@ export function listQaUnits(query: QaUnitsListQuery) {
 
 export function getQaUnit(unitId: string) {
   return apiRequest<QaUnitDetailDto>(`/v1/admin/qa/units/${unitId}`)
+}
+
+/** Location uploads the board sent while in QA and not bound to a child, newest first. */
+export function getQaUnitTestLog(unitId: string, limit = 100) {
+  return apiRequest<QaTestLogDto>(`/v1/admin/qa/units/${unitId}/test-log?limit=${limit}`)
 }
 
 export function updateQaUnit(unitId: string, input: UpdateQaUnitInput) {
