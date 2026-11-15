@@ -66,9 +66,15 @@ import {
   CELL_LOOKUP_LEASE_MS,
   getCellLookupIntervals,
   getInitialCellLookupAt,
+  hasNetworkObservationChanged,
   hasUsableNetworkObservation,
   isCellLookupDue,
+  nextRecentCells,
+  servingCellKey,
   shouldLookupEveryCellObservation,
+  shouldLookupForChangedNetwork,
+  TEST_DEVICE_CELL_LOOKUP_INTERVALS,
+  wifiLookupKeys,
   type CellLookupIntervals,
   type CellLookupMode,
 } from "./cell-geolocation";
@@ -593,7 +599,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
   const gpsConnected = input.gpsFixValid === undefined
     ? !(input.latitude === 0 && input.longitude === 0)
     : input.gpsFixValid && (input.satelliteCount ?? 0) >= 3;
-  const cellLookupIntervals = getCellLookupIntervals(input.simulation, env.NODE_ENV);
+  const cellLookupIntervals = env.NETWORK_LOOKUP_TEST_DEVICES.has(hardwareIdentifier)
+    ? TEST_DEVICE_CELL_LOOKUP_INTERVALS
+    : getCellLookupIntervals(input.simulation, env.NODE_ENV);
   const lookupEveryObservation = shouldLookupEveryCellObservation({
     nodeEnv: env.NODE_ENV,
     simulation: input.simulation,
@@ -655,6 +663,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
     let nextCellLookupAt = snapshot?.nextCellLookupAt ?? null;
     let cellLookupLeaseUntil = snapshot?.cellLookupLeaseUntil ?? null;
     let cellStableSampleCount = snapshot?.cellStableSampleCount ?? 0;
+    let networkLookupCells: string[] | null = snapshot?.networkLookupCells ?? null;
+    let networkLookupWifi: string[] | null = snapshot?.networkLookupWifi ?? null;
+    let lastNetworkLookupAt: Date | null = snapshot?.lastNetworkLookupAt ?? null;
     let shouldClaimCellLookup = false;
 
     if (gpsConnected) {
@@ -662,6 +673,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
       nextCellLookupAt = null;
       cellLookupLeaseUntil = null;
       cellStableSampleCount = 0;
+      networkLookupCells = null;
+      networkLookupWifi = null;
+      lastNetworkLookupAt = null;
     } else if (isStartingGpsOutage || !nextCellLookupAt) {
       cellLookupMode = "normal";
       nextCellLookupAt = getInitialCellLookupAt(sampleAt, cellLookupIntervals);
@@ -678,6 +692,27 @@ export async function ingestLocation(input: LocationTelemetryInput) {
           nextCellLookupAt = acceleratedLookupAt;
         }
       }
+      // A new tower or Wi-Fi set means the tracker moved: look up now rather
+      // than at the next scheduled time (at most every 30 s).
+      if (shouldLookupForChangedNetwork({
+        lastLookupAt: snapshot?.lastNetworkLookupAt,
+        nextLookupAt: nextCellLookupAt,
+        observedAt: sampleAt,
+        changed: hasNetworkObservationChanged({
+          recentCells: snapshot?.networkLookupCells,
+          lastWifi: snapshot?.networkLookupWifi,
+          cellular: input.cellular,
+          wifi: input.wifi,
+        }),
+      })) {
+        console.info("[network-geolocation] observation changed, lookup brought forward", {
+          childId: binding.child.id,
+          cell: servingCellKey(input.cellular),
+          wifiCount: wifiLookupKeys(input.wifi).length,
+          wasDueAt: nextCellLookupAt?.toISOString() ?? null,
+        });
+        nextCellLookupAt = sampleAt;
+      }
     }
 
     if (
@@ -692,6 +727,10 @@ export async function ingestLocation(input: LocationTelemetryInput) {
       if (env.CELL_GEOLOCATION_ENABLED && hasUsableNetworkObservation(input.cellular, input.wifi)) {
         shouldClaimCellLookup = true;
         cellLookupLeaseUntil = new Date(sampleAt.getTime() + CELL_LOOKUP_LEASE_MS);
+        networkLookupCells = nextRecentCells(networkLookupCells, servingCellKey(input.cellular));
+        const wifiKeys = wifiLookupKeys(input.wifi);
+        if (wifiKeys.length > 0) networkLookupWifi = wifiKeys;
+        lastNetworkLookupAt = sampleAt;
       } else if (!lookupEveryObservation) {
         nextCellLookupAt = new Date(sampleAt.getTime() + cellLookupIntervals.fastIntervalMs);
         cellLookupLeaseUntil = null;
@@ -823,6 +862,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
         lastCellLongitude: gpsConnected ? null : (snapshot?.lastCellLongitude ?? null),
         lastCellAccuracyMeters: gpsConnected ? null : (snapshot?.lastCellAccuracyMeters ?? null),
         lastCellEstimateAt: gpsConnected ? null : (snapshot?.lastCellEstimateAt ?? null),
+        networkLookupCells,
+        networkLookupWifi,
+        lastNetworkLookupAt,
         lastBatteryPercent: event.batteryPercent,
         lastBatteryVoltageMv: event.batteryVoltageMv,
         lastSignalStrength: event.signalStrength,
@@ -872,6 +914,9 @@ export async function ingestLocation(input: LocationTelemetryInput) {
           lastCellLongitude: gpsConnected ? null : (snapshot?.lastCellLongitude ?? null),
           lastCellAccuracyMeters: gpsConnected ? null : (snapshot?.lastCellAccuracyMeters ?? null),
           lastCellEstimateAt: gpsConnected ? null : (snapshot?.lastCellEstimateAt ?? null),
+          networkLookupCells,
+          networkLookupWifi,
+          lastNetworkLookupAt,
           lastBatteryPercent: event.batteryPercent,
           lastBatteryVoltageMv: event.batteryVoltageMv,
           lastSignalStrength: event.signalStrength,

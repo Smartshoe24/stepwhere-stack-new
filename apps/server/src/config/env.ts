@@ -36,6 +36,8 @@ const envSchema = z.object({
   GOOGLE_ROADS_API_KEY: z.string().min(1).optional(),
   GOOGLE_GEOLOCATION_API_KEY: z.string().min(1).optional(),
   CELL_GEOLOCATION_ENABLED: z.enum(["true", "false"]).default("false"),
+  /** Comma-separated tracker IMEIs that get a Wi-Fi/cell lookup every 30 s (bench tests only). */
+  NETWORK_LOOKUP_TEST_DEVICES: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   TWILIO_ACCOUNT_SID: z.string().min(1).optional(),
@@ -197,6 +199,11 @@ export const env = {
     parsedEnv.data.TRAIL_ROAD_SNAPPING_ENABLED === "true",
   CELL_GEOLOCATION_ENABLED:
     parsedEnv.data.CELL_GEOLOCATION_ENABLED === "true",
+  NETWORK_LOOKUP_TEST_DEVICES: new Set(
+    parsedEnv.data.NETWORK_LOOKUP_TEST_DEVICES?.split(",")
+      .map((id) => id.trim().toUpperCase())
+      .filter(Boolean) ?? [],
+  ),
   HISTORY_ROAD_SNAPPING_ENABLED:
     parsedEnv.data.HISTORY_ROAD_SNAPPING_ENABLED === "true",
   BETTER_AUTH_TRUSTED_ORIGINS:
