@@ -11,6 +11,15 @@ import { getEligibleWifiAccessPoints } from "./wifi-geolocation";
 // still tracker (it sleeps after ~5 min without steps) gets a position first.
 export const CELL_INITIAL_DELAY_MS = 2 * 60 * 1_000;
 export const CELL_NORMAL_INTERVAL_MS = 7 * 60 * 1_000;
+// A changed serving cell or Wi-Fi set brings the next lookup forward, but not
+// sooner than this after the previous one.
+export const NETWORK_CHANGE_MIN_INTERVAL_MS = 30 * 1_000;
+// Serving cells of recent lookups. A still tracker often flips between two or
+// three neighbouring towers; returning to one of these is not a move.
+export const NETWORK_RECENT_CELL_COUNT = 4;
+const NETWORK_WIFI_KEEP = 10;
+// Below this share of common access points the Wi-Fi set counts as changed.
+const NETWORK_WIFI_MIN_OVERLAP = 0.5;
 export const CELL_FAST_INTERVAL_MS = 60 * 1_000;
 export const CELL_LOOKUP_LEASE_MS = 15_000;
 export const CELL_MOVEMENT_THRESHOLD_METERS = 1_000;
@@ -153,4 +162,58 @@ export function advanceCellLookupAfterSuccess(input: {
     stableSampleCount: shouldReturnToNormal ? 0 : stableSampleCount,
     distanceFromPreviousMeters,
   };
+}
+
+/** "mcc-mnc-tac-cellId" of the serving tower, or null. */
+export function servingCellKey(cellular: CellularTelemetryInput | null | undefined) {
+  const tower = cellular?.towers.find((candidate) => candidate.role === "serving");
+  if (!tower) return null;
+  return `${tower.mobileCountryCode}-${tower.mobileNetworkCode}-${tower.trackingAreaCode}-${tower.cellId}`;
+}
+
+/** BSSIDs of the strongest usable access points (empty below the 2 a lookup needs). */
+export function wifiLookupKeys(wifi: WifiTelemetryInput | null | undefined) {
+  const points = getEligibleWifiAccessPoints(wifi);
+  return points.length >= 2 ? points.slice(0, NETWORK_WIFI_KEEP).map((point) => point.macAddress) : [];
+}
+
+/** Recent serving cells with the newest first, for the snapshot after a lookup. */
+export function nextRecentCells(previous: readonly string[] | null | undefined, cell: string | null) {
+  const kept = (previous ?? []).filter((key) => key !== cell);
+  return (cell ? [cell, ...kept] : kept).slice(0, NETWORK_RECENT_CELL_COUNT);
+}
+
+/**
+ * True when the tracker now sees a serving cell none of the recent lookups
+ * used, or a usable Wi-Fi set that shares less than half its access points
+ * with the last lookup's. A missing Wi-Fi scan is never a change: scans fail
+ * now and then while the tracker stands still.
+ */
+export function hasNetworkObservationChanged(input: {
+  recentCells: readonly string[] | null | undefined;
+  lastWifi: readonly string[] | null | undefined;
+  cellular: CellularTelemetryInput | null | undefined;
+  wifi: WifiTelemetryInput | null | undefined;
+}) {
+  const cell = hasUsableCellObservation(input.cellular) ? servingCellKey(input.cellular) : null;
+  if (cell && !(input.recentCells ?? []).includes(cell)) return true;
+
+  const now = wifiLookupKeys(input.wifi);
+  if (now.length === 0) return false;
+  const before = new Set(input.lastWifi ?? []);
+  if (before.size < 2) return true;
+  const common = now.filter((key) => before.has(key)).length;
+  return common / Math.min(now.length, before.size) < NETWORK_WIFI_MIN_OVERLAP;
+}
+
+/** Whether a changed observation may bring the lookup forward now. */
+export function shouldLookupForChangedNetwork(input: {
+  lastLookupAt: Date | null | undefined;
+  nextLookupAt: Date | null;
+  observedAt: Date;
+  changed: boolean;
+}) {
+  if (!input.changed || !input.lastLookupAt || !input.nextLookupAt) return false;
+  if (input.nextLookupAt <= input.observedAt) return false;   // already due
+  return input.observedAt.getTime() - input.lastLookupAt.getTime() >= NETWORK_CHANGE_MIN_INTERVAL_MS;
 }

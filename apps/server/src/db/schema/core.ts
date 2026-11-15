@@ -359,6 +359,11 @@ export const childStatusSnapshots = pgTable("child_status_snapshots", {
   lastCellLongitude: numeric("last_cell_longitude", { precision: 9, scale: 6 }),
   lastCellAccuracyMeters: numeric("last_cell_accuracy_meters", { precision: 10, scale: 2 }),
   lastCellEstimateAt: timestamp("last_cell_estimate_at", { withTimezone: true }),
+  // What the last Wi-Fi/cell lookups saw, so a changed tower or Wi-Fi set can
+  // trigger an early lookup (cell-geolocation.ts hasNetworkObservationChanged).
+  networkLookupCells: text("network_lookup_cells").array(),
+  networkLookupWifi: text("network_lookup_wifi").array(),
+  lastNetworkLookupAt: timestamp("last_network_lookup_at", { withTimezone: true }),
   lastBatteryPercent: integer("last_battery_percent"),
   lastBatteryVoltageMv: integer("last_battery_voltage_mv"),
   lastSignalStrength: smallint("last_signal_strength"),
