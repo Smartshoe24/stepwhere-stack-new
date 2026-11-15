@@ -6,6 +6,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   smallint,
@@ -156,11 +157,49 @@ export const qaUnits = pgTable("qa_units", {
   notes: text("notes"),
   /** What the board proved over the air after production firmware (functional tests). */
   functionalChecks: jsonb("functional_checks").$type<QaFunctionalChecks | null>(),
+  /** Wi-Fi/cell (Google) lookups made for this board's QA firmware uploads, at most QA_NETWORK_LOOKUP_MAX. */
+  networkLookups: smallint("network_lookups").notNull().default(0),
+  lastNetworkLookupAt: instant("last_network_lookup_at"),
+  /** First time a lookup returned a position: the "Wi-Fi/GSM location" check passed. */
+  networkLocatedAt: instant("network_located_at"),
   createdAt: instant("created_at").notNull().defaultNow(),
   updatedAt: instant("updated_at").notNull().defaultNow(),
 }, (t) => [
   index("qa_units_stage_idx").on(t.stage, t.stageStatus),
   index("qa_units_updated_idx").on(t.updatedAt),
+]);
+
+/**
+ * Test log: every location upload from a board that is not bound to a child
+ * while it is in QA (before Ready to ship). Kept for good.
+ */
+export const qaUnitReports = pgTable("qa_unit_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  unitId: uuid("unit_id").notNull().references(() => qaUnits.id, { onDelete: "cascade" }),
+  receivedAt: instant("received_at").notNull().defaultNow(),
+  /** "qa-0.7.0" from QA firmware, "2.2.0" from production firmware. */
+  firmware: text("firmware"),
+  stage: qaUnitStageEnum("stage").notNull(),
+  gpsFix: boolean("gps_fix").notNull().default(false),
+  latitude: numeric("latitude", { precision: 9, scale: 6 }),
+  longitude: numeric("longitude", { precision: 9, scale: 6 }),
+  satelliteCount: integer("satellite_count"),
+  /** Serving cell "mcc-mnc-tac-cellId". */
+  cell: text("cell"),
+  towerCount: integer("tower_count").notNull().default(0),
+  wifiCount: integer("wifi_count").notNull().default(0),
+  batteryVoltageMv: integer("battery_voltage_mv"),
+  stepCounter: integer("step_counter"),
+  /** Result of the Wi-Fi/cell lookup made for this upload, if one was made. */
+  networkLookup: boolean("network_lookup").notNull().default(false),
+  networkLatitude: numeric("network_latitude", { precision: 9, scale: 6 }),
+  networkLongitude: numeric("network_longitude", { precision: 9, scale: 6 }),
+  networkAccuracyMeters: numeric("network_accuracy_meters", { precision: 10, scale: 2 }),
+  networkError: text("network_error"),
+  /** The upload as received. */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+}, (t) => [
+  index("qa_unit_reports_unit_idx").on(t.unitId, t.receivedAt),
 ]);
 
 /** Append-only timeline of everything that happened to a unit. */

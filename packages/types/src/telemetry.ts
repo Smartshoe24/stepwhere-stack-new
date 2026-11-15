@@ -196,6 +196,16 @@ export type FirmwareStatusInput = {
   avail?: string;
   /** Download progress in percent. */
   dl?: number;
+  /** STM32 chip UID, 24 hex characters (firmware 2.2.1 and later). */
+  uid?: string;
+};
+
+/** Sent by the QA firmware's netloc test instead of the fw block. */
+export type QaTelemetryInput = {
+  /** STM32 chip UID, 24 hex characters. */
+  uid: string;
+  /** QA firmware version, e.g. "qa-0.7.0". */
+  fw: string;
 };
 
 export type LocationTelemetryInput = {
@@ -217,6 +227,7 @@ export type LocationTelemetryInput = {
   stepCounter: number;
   deviceState?: "active" | "sleep" | "offline";
   fw?: FirmwareStatusInput;
+  qa?: QaTelemetryInput;
 };
 
 export type StepTelemetryInput = {

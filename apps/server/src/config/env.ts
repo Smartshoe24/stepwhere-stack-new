@@ -38,6 +38,8 @@ const envSchema = z.object({
   CELL_GEOLOCATION_ENABLED: z.enum(["true", "false"]).default("false"),
   /** Comma-separated tracker IMEIs that get a Wi-Fi/cell lookup every 30 s (bench tests only). */
   NETWORK_LOOKUP_TEST_DEVICES: z.string().optional(),
+  /** Comma-separated IMEI prefixes (modem TACs) a never-seen board may be auto-registered with. */
+  QA_AUTO_REGISTER_TACS: z.string().default("86993808"),
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   TWILIO_ACCOUNT_SID: z.string().min(1).optional(),
@@ -199,6 +201,9 @@ export const env = {
     parsedEnv.data.TRAIL_ROAD_SNAPPING_ENABLED === "true",
   CELL_GEOLOCATION_ENABLED:
     parsedEnv.data.CELL_GEOLOCATION_ENABLED === "true",
+  QA_AUTO_REGISTER_TACS: parsedEnv.data.QA_AUTO_REGISTER_TACS.split(",")
+    .map((tac) => tac.trim())
+    .filter((tac) => /^\d{8}$/.test(tac)),
   NETWORK_LOOKUP_TEST_DEVICES: new Set(
     parsedEnv.data.NETWORK_LOOKUP_TEST_DEVICES?.split(",")
       .map((id) => id.trim().toUpperCase())

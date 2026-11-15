@@ -127,3 +127,19 @@ describe("telemetry location schema (dev firmware payloads)", () => {
     expect(schema.safeParse(payload).success).toBe(false);
   });
 });
+
+describe("telemetry location schema (QA test log)", () => {
+  const uid = "0039003A3133510537363830";
+
+  it("accepts the QA firmware's qa block and the chip UID in the fw block", () => {
+    const qa = schema.safeParse({ ...base, qa: { uid, fw: "qa-0.7.0" } });
+    expect(qa.success).toBe(true);
+    expect(qa.success && qa.data.qa).toEqual({ uid, fw: "qa-0.7.0" });
+    expect(schema.safeParse({ ...base, fw: { app: "2.2.1", uid } }).success).toBe(true);
+  });
+
+  it("refuses a chip UID that is not 24 hex characters", () => {
+    expect(schema.safeParse({ ...base, qa: { uid: "1234", fw: "qa-0.7.0" } }).success).toBe(false);
+    expect(schema.safeParse({ ...base, fw: { app: "2.2.1", uid: "Z".repeat(24) } }).success).toBe(false);
+  });
+});

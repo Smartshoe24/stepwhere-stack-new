@@ -19,6 +19,7 @@ import { getChildHistoryDayForOrganization } from "../history/history.service";
 import { deviceIngestAuthMiddleware } from "./device-ingest.middleware";
 import { telemetryIngestDebugMiddleware } from "./telemetry-ingest-debug.middleware";
 import { getChildTrailForOrganization, getLocationHistoryForOrganization, getLiveChildForOrganization, ingestLocation, ingestSteps } from "./telemetry.service";
+import { QaTestReportAccepted } from "../qa-units/qa-test-log.helpers";
 
 const cellularTowerSchema = z.object({
   role: z.enum(["serving", "neighbor"]),
@@ -211,6 +212,13 @@ const firmwareStatusSchema = z.object({
   last: z.string().max(24).optional(),
   avail: z.string().max(16).optional(),
   dl: z.number().int().min(0).max(100).optional(),
+  uid: z.string().regex(/^[0-9A-Fa-f]{24}$/).optional(),
+});
+
+// Sent by the QA firmware's netloc test (apps/firmware/stepwhere.qa.ino).
+const qaTelemetrySchema = z.object({
+  uid: z.string().regex(/^[0-9A-Fa-f]{24}$/),
+  fw: z.string().trim().min(1).max(24),
 });
 
 const locationSchema = z.object({
@@ -230,6 +238,13 @@ const locationSchema = z.object({
   stepCounter: z.number().int().nonnegative(),
   deviceState: z.enum(["active", "sleep", "offline"]).optional(),
   fw: firmwareStatusSchema.optional(),
+  qa: qaTelemetrySchema.optional(),
+});
+
+// 201 for a board in QA that is not bound to a child: the upload went to its test log.
+const qaTestReportAcceptedSchema = z.object({
+  qaUnitId: z.string().uuid(),
+  testLog: z.literal(true),
 });
 
 const stepSchema = z.object({
@@ -308,7 +323,10 @@ const ingestLocationRoute = createRoute({
     },
   },
   responses: {
-    201: jsonDataResponse(ChildSummarySchema, "Ingested location telemetry."),
+    201: jsonDataResponse(
+      z.union([ChildSummarySchema, qaTestReportAcceptedSchema]),
+      "Ingested location telemetry, or (board in QA, not bound to a child) recorded in its test log.",
+    ),
     ...errorResponses([400, 401, 404, 409, 503]),
   },
 });
@@ -392,7 +410,14 @@ const familyTelemetryRoutes = createOpenApiApp();
 
 telemetryIngestRoutes.openapi(ingestLocationRoute, async (c) => {
   const body = c.req.valid("json");
-  return created(c, await ingestLocation(body));
+  try {
+    return created(c, await ingestLocation(body));
+  } catch (error) {
+    if (error instanceof QaTestReportAccepted) {
+      return created(c, { qaUnitId: error.unitId, testLog: true as const });
+    }
+    throw error;
+  }
 });
 
 telemetryIngestRoutes.openapi(ingestStepsRoute, async (c) => {

@@ -1,9 +1,10 @@
-import { and, asc, count, desc, eq, gte, ilike, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { QA_UNIT_STAGES } from "@stepwhere/types";
 import type {
   QaBenchJobDto,
   QaFirmwareChannel,
+  QaMotionIcDto,
   QaOverviewDto,
   QaSerialLine,
   QaStationUnitDto,
@@ -37,6 +38,7 @@ import { listJobsForUnit, loadFirmwareDto } from "../qa-bench/qa-bench.service";
 import { qaBenchRegistry } from "../qa-bench/qa-bench.registry";
 import { findSlotIdForPort } from "../qa-bench/qa-slots.service";
 import { listTestRunsForUnit } from "./qa-test-runs.query";
+import { motionIcFromRuns } from "./qa-motion.helpers";
 import { broadcastUnitChanged } from "./qa-units.realtime";
 import {
   STATION_UNIT_WINDOW_MS,
@@ -114,7 +116,7 @@ function selectUnits() {
 
 type UnitSelectRow = Awaited<ReturnType<typeof selectUnits>>[number];
 
-function toUnitListItem(row: UnitSelectRow, now = new Date()): QaUnitListItemDto {
+function toUnitListItem(row: UnitSelectRow, now = new Date(), motionIc: QaMotionIcDto | null = null): QaUnitListItemDto {
   const { unit, firmware, device } = row;
 
   return {
@@ -141,6 +143,7 @@ function toUnitListItem(row: UnitSelectRow, now = new Date()): QaUnitListItemDto
     fieldState: unit.stage === "delivered" && unit.stageStatus !== "scrapped"
       ? deriveFieldState(device?.lastSeenAt ?? null, now)
       : null,
+    motionIc,
     createdAt: unit.createdAt.toISOString(),
     updatedAt: unit.updatedAt.toISOString(),
   };
@@ -160,6 +163,25 @@ async function requireUnitRow(unitId: string) {
   }
 
   return row;
+}
+
+/** Motion IC status per unit from its recent board-test runs (newest first). */
+async function motionIcByUnit(unitIds: string[]) {
+  const result = new Map<string, QaMotionIcDto>();
+  if (unitIds.length === 0) return result;
+  const runs = await db
+    .select({ unitId: qaTestRuns.unitId, results: qaTestRuns.results, startedAt: qaTestRuns.startedAt })
+    .from(qaTestRuns)
+    .where(inArray(qaTestRuns.unitId, unitIds))
+    .orderBy(desc(qaTestRuns.startedAt))
+    .limit(unitIds.length * 10);
+  const byUnit = new Map<string, typeof runs>();
+  for (const run of runs) {
+    if (!run.unitId) continue;
+    byUnit.set(run.unitId, [...(byUnit.get(run.unitId) ?? []), run]);
+  }
+  for (const id of unitIds) result.set(id, motionIcFromRuns(byUnit.get(id) ?? []));
+  return result;
 }
 
 const UNIT_SORTS = {
@@ -200,9 +222,10 @@ export async function listUnits(query: Required<Pick<QaUnitsListQuery, "page" | 
   ]);
 
   const now = new Date();
+  const motion = await motionIcByUnit(rows.map((row) => row.unit.id));
 
   return {
-    items: rows.map((row) => toUnitListItem(row, now)),
+    items: rows.map((row) => toUnitListItem(row, now, motion.get(row.unit.id) ?? null)),
     page: query.page,
     pageSize: query.pageSize,
     total,
@@ -253,7 +276,7 @@ export async function getUnitDetail(unitId: string): Promise<QaUnitDetailDto> {
   ]);
 
   return {
-    ...toUnitListItem(row),
+    ...toUnitListItem(row, new Date(), motionIcFromRuns(testRuns)),
     notes: row.unit.notes,
     functionalChecks: row.unit.functionalChecks ?? null,
     firmware,
@@ -511,7 +534,7 @@ export async function handleStationSerialLines(stationId: string, path: string, 
 type LinkContext = { source: "ttl" | "manual"; stationId: string | null; actorUserId: string | null };
 
 /** The devices row for an IMEI, created as a fresh embedded device when missing. */
-async function ensureDeviceForImei(executor: Executor, imei: string) {
+export async function ensureDeviceForImei(executor: Executor, imei: string) {
   const [existing] = await executor
     .select({ id: devices.id })
     .from(devices)

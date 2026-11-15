@@ -78,8 +78,24 @@ export type QaUnitListItemDto = {
   device: QaUnitDeviceDto | null;
   /** Only for delivered units. */
   fieldState: QaUnitFieldState | null;
+  /** Motion sensor from the latest QA board tests (imu + built-in self-test). Null where not loaded. */
+  motionIc: QaMotionIcDto | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/**
+ * The motion sensor (LIS2DH12) as the QA firmware proved it without motion:
+ * it answers on I2C with the right ID and reads about 1 g at rest (imu), and
+ * its built-in self-test moves the sensing element on all three axes (steps).
+ */
+export type QaMotionIcDto = {
+  status: "passed" | "failed" | "untested";
+  /** "LIS2DH12" or "LIS2DS12" as the board reported it. */
+  chip: string | null;
+  /** Short reason or measurement, e.g. "self-test 412 / 398 / 655 mg". */
+  detail: string | null;
+  testedAt: string | null;
 };
 
 export type QaUnitEventDto = {
@@ -113,6 +129,54 @@ export type QaFunctionalChecks = {
   batteryVoltageMv: number | null;
   /** When every check had passed and the unit moved to Functional tests: passed. */
   passedAt: string | null;
+};
+
+/** One location upload from a board in QA that is not bound to a child. */
+export type QaTestReportDto = {
+  id: string;
+  receivedAt: string;
+  firmware: string | null;
+  stage: QaUnitStage;
+  gpsFix: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  satelliteCount: number | null;
+  /** Serving cell "mcc-mnc-tac-cellId". */
+  cell: string | null;
+  towerCount: number;
+  wifiCount: number;
+  batteryVoltageMv: number | null;
+  stepCounter: number | null;
+  /** True when a Wi-Fi/cell lookup was made for this upload. */
+  networkLookup: boolean;
+  networkLatitude: number | null;
+  networkLongitude: number | null;
+  networkAccuracyMeters: number | null;
+  networkError: string | null;
+};
+
+export type QaTestLogDto = {
+  unitId: string;
+  /** Wi-Fi/cell lookups made so far and the most a board gets. */
+  networkLookups: number;
+  networkLookupMax: number;
+  /** When a lookup first returned a position ("Wi-Fi/GSM location" passed). */
+  networkLocatedAt: string | null;
+  total: number;
+  /** Final test (the board in its shoe): the step counter must rise while the operator moves the shoe. */
+  finalTestSteps: QaFinalTestStepsDto | null;
+  /** Newest first. */
+  entries: QaTestReportDto[];
+};
+
+export type QaFinalTestStepsDto = {
+  /** Step counter in the first and the latest upload of the Final test stage. */
+  first: number;
+  latest: number;
+  increase: number;
+  target: number;
+  passed: boolean;
+  reports: number;
 };
 
 export type QaUnitDetailDto = QaUnitListItemDto & {
