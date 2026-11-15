@@ -47,7 +47,7 @@
 #include "src/pedometer.h"
 #include "src/radio_parsers.h"
 
-#define QA_FW_VERSION "qa-0.7.1"
+#define QA_FW_VERSION "qa-0.7.2"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -363,6 +363,7 @@ void read_chip_uid() {
 }
 
 void report_running(TestId id) {
+  mark_running(id);
   SerialDBG.print("[QA] ");
   SerialDBG.print(TEST_NAMES[id]);
   SerialDBG.println(" ...");
@@ -398,6 +399,7 @@ void print_result_human(TestId id, Outcome outcome, uint32_t ms, const char *err
 
 /** Starts a result line; the caller adds data fields and calls end(). */
 QaLine result_line(TestId id, Outcome outcome, uint32_t ms, const char *error = nullptr) {
+  TAMP->BKP0R = 0;
   run.outcome[id] = outcome;
   print_result_human(id, outcome, ms, error);
   QaLine line = run_line("test");
@@ -412,12 +414,59 @@ void skip(TestId id, const char *reason) {
   result_line(id, Outcome::Skip, 0, reason).end();
 }
 
+// ─── Watchdog: a test that hangs is skipped after the restart ───────────────
+// A faulty part can hang the bus driver (seen with a LIS2DH12 on I2C). The
+// independent watchdog restarts the board after QA_WATCHDOG_MS without a kick;
+// the test that was running is kept in a TAMP backup register (it survives a
+// reset) and reported as failed on the next run instead of hanging again.
+constexpr uint32_t QA_WATCHDOG_RELOAD = 2000;   // LSI 32 kHz / 256 = 125 Hz: 16 s
+constexpr uint32_t QA_HANG_MAGIC = 0x51A60000UL;
+uint8_t hungTest = 0xFF;
+
+void watchdog_start() {
+  IWDG->KR = 0xCCCC;  // start
+  IWDG->KR = 0x5555;  // unlock PR / RLR
+  IWDG->PR = 6;       // /256
+  IWDG->RLR = QA_WATCHDOG_RELOAD;
+  while (IWDG->SR) {}
+  IWDG->KR = 0xAAAA;
+}
+
+inline void watchdog_kick() { IWDG->KR = 0xAAAA; }
+
+void mark_running(uint8_t id) { TAMP->BKP0R = QA_HANG_MAGIC | id; }
+
+/** Reads why the board restarted; remembers the test that hung, if the watchdog restarted it. */
+void hang_check_at_boot() {
+  __HAL_RCC_PWR_CLK_ENABLE();
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_RTCAPB_CLK_ENABLE();
+  const bool watchdogReset = (RCC->CSR & RCC_CSR_IWDGRSTF) != 0;
+  const uint32_t marker = TAMP->BKP0R;
+  if (watchdogReset && (marker & 0xFFFFFF00UL) == QA_HANG_MAGIC && (marker & 0xFF) < TEST_COUNT) {
+    hungTest = (uint8_t)(marker & 0xFF);
+  }
+  TAMP->BKP0R = 0;
+  RCC->CSR |= RCC_CSR_RMVF;
+}
+
+/** True (and the test reported failed) when it hung on the previous run; then it runs again next time. */
+bool skip_hung(TestId id) {
+  if (hungTest != id) return false;
+  hungTest = 0xFF;
+  run_line("test").str("id", TEST_NAMES[id]).str("status", "running").end();
+  result_line(id, Outcome::Fail, 0, "Hung on the previous run; the watchdog restarted the board (faulty part?)")
+    .data().flag("watchdogReset", true).end();
+  return true;
+}
+
 // ─── Background work during every wait ───────────────────────────────────────
 
 void poll_console();
 
 /** Feeds the GPS parser and the console. Call it from every wait loop. */
 void service() {
+  watchdog_kick();
   while (SerialGPS.available()) gps.encode(SerialGPS.read());
   poll_console();
 }
@@ -1845,9 +1894,9 @@ void run_tests(uint16_t requested) {
   }
 
   const bool radios = selected(T_MODEM) || selected(T_GPS);
-  if (selected(T_POWER)) test_power();
-  if (selected(T_IMU)) test_imu();
-  if (selected(T_FLASH)) test_flash();
+  if (selected(T_POWER) && !skip_hung(T_POWER)) test_power();
+  if (selected(T_IMU) && !skip_hung(T_IMU)) test_imu();
+  if (selected(T_FLASH) && !skip_hung(T_FLASH)) test_flash();
 
   const bool powerOk = !run.batteryLow;
   if (radios && powerOk && !aborted()) power_cycle_radios();
@@ -1856,48 +1905,48 @@ void run_tests(uint16_t requested) {
   if (selected(T_MODEM)) {
     if (aborted()) skip(T_MODEM, "Aborted");
     else if (!powerOk) skip(T_MODEM, "Battery too low");
-    else test_modem();
+    else if (!skip_hung(T_MODEM)) test_modem();
   }
   if (selected(T_SIM)) {
     if (aborted()) skip(T_SIM, "Aborted");
     else if (!passed(T_MODEM)) skip(T_SIM, "Modem not ready");
-    else test_sim();
+    else if (!skip_hung(T_SIM)) test_sim();
   }
   if (selected(T_GSM)) {
     if (aborted()) skip(T_GSM, "Aborted");
     else if (!passed(T_SIM)) skip(T_GSM, "SIM not ready");
-    else test_gsm();
+    else if (!skip_hung(T_GSM)) test_gsm();
   }
   if (selected(T_WIFI)) {
     if (aborted()) skip(T_WIFI, "Aborted");
     else if (!passed(T_MODEM)) skip(T_WIFI, "Modem not ready");
-    else test_wifi();
+    else if (!skip_hung(T_WIFI)) test_wifi();
   }
   if (selected(T_CELL)) {
     if (aborted()) skip(T_CELL, "Aborted");
     else if (!run.registered) skip(T_CELL, "Not registered on the network");
-    else test_cell();
+    else if (!skip_hung(T_CELL)) test_cell();
   }
   if (selected(T_DATA)) {
     if (aborted()) skip(T_DATA, "Aborted");
     else if (!run.registered) skip(T_DATA, "Not registered on the network");
-    else test_data();
+    else if (!skip_hung(T_DATA)) test_data();
   }
   if (selected(T_STEPS)) {
     if (aborted()) skip(T_STEPS, "Aborted");
     else if (!passed(T_IMU)) skip(T_STEPS, "Accelerometer not working");
-    else test_steps();
+    else if (!skip_hung(T_STEPS)) test_steps();
   }
   if (selected(T_GPS)) {
     if (aborted()) skip(T_GPS, "Aborted");
     else if (!powerOk) skip(T_GPS, "Battery too low");
-    else test_gps();
+    else if (!skip_hung(T_GPS)) test_gps();
   }
   // Last: it takes about 5 minutes, and by now GPS may have a fix to send along.
   if (selected(T_NETLOC)) {
     if (aborted()) skip(T_NETLOC, "Aborted");
     else if (!passed(T_DATA)) skip(T_NETLOC, "No data connection");
-    else test_netloc();
+    else if (!skip_hung(T_NETLOC)) test_netloc();
   }
 
   uint8_t passedCount = 0, failedCount = 0, skippedCount = 0;
@@ -2034,6 +2083,8 @@ void setup() {
   // INT2 (PB4) is set up by lis2ds12_configure() once a LIS2DS12 is found.
   qaI2c.begin();
 
+  hang_check_at_boot();
+  watchdog_start();
   SerialDBG.begin(CONSOLE_BAUD);
   delay(200);
   read_chip_uid();
@@ -2047,7 +2098,7 @@ void setup() {
 }
 
 void loop() {
-  service();
+  service();  // also kicks the watchdog
   if (pendingRun) {
     const uint16_t tests = pendingRun;
     pendingRun = 0;
