@@ -107,6 +107,7 @@ export default function AddChildConnectDeviceScreen() {
       )}
       progressCurrent={1}
       progressTotal={2}
+      showLogout={false}
       title="Connect shoe">
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Scan shoe QR</Text>

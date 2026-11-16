@@ -233,6 +233,7 @@ export default function AddChildDetailsScreen() {
       )}
       progressCurrent={2}
       progressTotal={2}
+      showLogout={false}
       subtitle={reservationHardwareIdentifier ? `Shoe ID: ${reservationHardwareIdentifier}` : undefined}
       title="Child details">
       <AvatarPhotoField

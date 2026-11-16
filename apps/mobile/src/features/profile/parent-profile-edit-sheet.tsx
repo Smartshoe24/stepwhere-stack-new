@@ -39,7 +39,10 @@ function getInitials(name: string) {
 }
 
 export function ParentProfileEditSheet(props: ParentProfileEditSheetProps) {
-  const stateKey = `${props.visible ? 'open' : 'closed'}:${props.initialValue.displayName}:${props.initialValue.email ?? ''}:${props.initialValue.dateOfBirth ?? ''}:${props.initialValue.currentAddress ?? ''}:${props.initialValue.avatarUrl ?? ''}`;
+  // The avatar URL is deliberately not part of this key. The server returns a
+  // fresh signed URL on every profile fetch, so including it remounted the sheet
+  // on any background refetch and wiped the photo the user had just picked.
+  const stateKey = `${props.visible ? 'open' : 'closed'}:${props.initialValue.displayName}:${props.initialValue.email ?? ''}:${props.initialValue.dateOfBirth ?? ''}:${props.initialValue.currentAddress ?? ''}`;
 
   return (
     <Modal animationType="slide" onRequestClose={props.onClose} presentationStyle="overFullScreen" transparent visible={props.visible}>
@@ -159,8 +162,18 @@ function ParentProfileEditSheetBody({
         ...(avatarUrl !== undefined ? { avatarUrl } : {}),
       });
 
+      if (__DEV__) {
+        console.info('[profile] saved', {
+          uploadedNewAvatar: Boolean(selectedAvatar),
+          returnedAvatarUrl: profile.avatarUrl,
+        });
+      }
+
       auth.applyProfilePatch(profile);
       onClose();
+
+      // Reload from the server so every screen shows the saved photo.
+      void auth.refreshSession().catch(() => undefined);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Failed to update the profile.');
     }

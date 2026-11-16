@@ -14,6 +14,8 @@ type MinimalOnboardingScreenProps = {
   footer?: React.ReactNode;
   progressCurrent: number;
   progressTotal: number;
+  /** Set to false on screens where signing out from the header makes no sense. */
+  showLogout?: boolean;
   subtitle?: string;
   title: string;
 };
@@ -24,6 +26,7 @@ export function MinimalOnboardingScreen({
   footer,
   progressCurrent,
   progressTotal,
+  showLogout = true,
   subtitle,
   title,
 }: MinimalOnboardingScreenProps) {
@@ -61,7 +64,10 @@ export function MinimalOnboardingScreen({
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android is edge-to-edge, so the window no longer resizes for the
+        // keyboard. Without padding here the keyboard covers the lower part of
+        // the form, including the school suggestions list.
+        behavior="padding"
         style={styles.keyboard}>
         <View style={styles.screen}>
           <View style={styles.header}>
@@ -79,20 +85,24 @@ export function MinimalOnboardingScreen({
             <View style={styles.progressWrap}>
               <Text style={styles.progress}>{`${progressCurrent} of ${progressTotal}`}</Text>
             </View>
-            <Pressable
-              accessibilityLabel="Log out"
-              accessibilityRole="button"
-              disabled={isSigningOut}
-              onPress={() => {
-                void handleSignOut();
-              }}
-              style={({ pressed }) => [
-                styles.logoutButton,
-                isSigningOut && styles.disabled,
-                pressed && styles.pressed,
-              ]}>
-              <AppIcon color={styles.logoutIcon.color} name="logout" size={18} />
-            </Pressable>
+            {showLogout ? (
+              <Pressable
+                accessibilityLabel="Log out"
+                accessibilityRole="button"
+                disabled={isSigningOut}
+                onPress={() => {
+                  void handleSignOut();
+                }}
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  isSigningOut && styles.disabled,
+                  pressed && styles.pressed,
+                ]}>
+                <AppIcon color={styles.logoutIcon.color} name="logout" size={18} />
+              </Pressable>
+            ) : (
+              <View style={styles.backSpacer} />
+            )}
           </View>
 
           <ScrollView

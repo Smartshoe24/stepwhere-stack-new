@@ -16,6 +16,14 @@ type FamilyInviteQrSheetProps = {
   visible: boolean;
 };
 
+// Family names are often stored with the word already in them ("Sharma Family",
+// or the "Family" fallback), so only add the suffix when it is missing.
+function formatFamilyLabel(familyName: string) {
+  const trimmed = familyName.trim();
+
+  return /\bfamily$/i.test(trimmed) ? trimmed : `${trimmed} family`;
+}
+
 function formatRemaining(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -152,7 +160,7 @@ function FamilyInviteQrSheetBody({ familyName, onClose }: Omit<FamilyInviteQrShe
         </View>
 
         <View style={styles.familyChip}>
-          <Text style={styles.familyChipTitle}>{familyName} family</Text>
+          <Text style={styles.familyChipTitle}>{formatFamilyLabel(familyName)}</Text>
           <Text style={styles.familyChipLabel}>Member</Text>
         </View>
 
