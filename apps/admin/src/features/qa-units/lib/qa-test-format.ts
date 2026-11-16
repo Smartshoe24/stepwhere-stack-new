@@ -83,11 +83,14 @@ export function summarizeResult(result: QaTestResultDto): string | null {
     case 'gsm': {
       const registerMs = num(data, 'registerMs')
       const rssi = num(data, 'rssiDbm')
+      // qa-0.7.3: on LTE (CSQ 99) the signal is RSRP from AT+NETDMSG.
+      const rsrp = num(data, 'rsrpDbm')
       const limit = num(data, 'limitMs')
       return [
         registerMs != null && `Registered in ${formatSeconds(registerMs)}`,
         limit != null && `limit ${formatSeconds(limit)}`,
         rssi != null && `${rssi} dBm`,
+        rssi == null && rsrp != null && `RSRP ${rsrp} dBm`,
       ]
         .filter(Boolean)
         .join(' · ')

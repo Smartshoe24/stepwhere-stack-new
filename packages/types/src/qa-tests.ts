@@ -47,9 +47,14 @@ export const QA_BOARD_TESTS: Record<QaBoardTestId, { label: string; description:
   sim: { label: "SIM", description: "SIM is ready; IMEI and ICCID are read." },
   gsm: {
     label: "GSM",
-    description: "Registered on the network within 60 s of power-on, with signal strength CSQ of at least 10.",
+    description:
+      "Registered on the network within 60 s of power-on, with signal strength CSQ of at least 10. On LTE, where CSQ is unknown (99), RSRP of at least -110 dBm instead.",
   },
-  wifi: { label: "Wi-Fi scan", description: "The modem's Wi-Fi scan sees at least one access point." },
+  wifi: {
+    label: "Wi-Fi scan",
+    description:
+      "The modem's Wi-Fi scan sees at least one access point. The scan waits for 12 s of radio quiet after registration and is retried up to 3 times on ERROR.",
+  },
   cell: { label: "Cell tower", description: "AT+NETDMSG returns a valid LTE serving cell." },
   data: { label: "Data link", description: "A data connection comes up with an IP address." },
   steps: {
