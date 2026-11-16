@@ -62,7 +62,7 @@ export function ProfileIdentityCard({
                 start={{ x: 0, y: 0.5 }}
                 style={styles.avatarPhotoRing}
               >
-                <Image contentFit="cover" source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                <Image contentFit="cover" key={avatarUrl} source={{ uri: avatarUrl }} style={styles.avatarImage} />
               </LinearGradient>
             ) : (
               <LinearGradient

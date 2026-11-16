@@ -159,13 +159,20 @@ export function ProfileScreen() {
     router.push('/family/members');
   }
 
+  // The notice banner sits at the top of the page while the Switch family card
+  // is near the bottom, so a banner alone looks like the tap did nothing.
+  function showLeaveBlocked(message: string) {
+    setNotice(message);
+    Alert.alert('Switch family', message);
+  }
+
   function confirmLeaveFamily() {
     if (!user?.family.organization) {
       return;
     }
 
     if (memberRole === 'admin' && overviewChildren.length > 0) {
-      setNotice('Remove children before leaving this family.');
+      showLeaveBlocked('Remove children before leaving this family.');
       return;
     }
 
@@ -192,16 +199,16 @@ export function ProfileScreen() {
       router.replace('/onboarding/family');
     } catch (error) {
       if (error instanceof ApiError && error.code === 'FAMILY_HAS_MEMBERS') {
-        setNotice('Remove family members before leaving this family.');
+        showLeaveBlocked('Remove family members before leaving this family.');
         return;
       }
 
       if (error instanceof ApiError && error.code === 'FAMILY_HAS_CHILDREN') {
-        setNotice('Remove children before leaving this family.');
+        showLeaveBlocked('Remove children before leaving this family.');
         return;
       }
 
-      setNotice('Could not leave family. Try again.');
+      showLeaveBlocked('Could not leave family. Try again.');
     }
   }
 
