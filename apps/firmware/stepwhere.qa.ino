@@ -47,7 +47,7 @@
 #include "src/pedometer.h"
 #include "src/radio_parsers.h"
 
-#define QA_FW_VERSION "qa-0.7.2"
+#define QA_FW_VERSION "qa-0.7.3"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -57,6 +57,10 @@ constexpr uint16_t ADC_SATURATED_RAW = 4090;        // 12-bit ADC pinned at the 
 constexpr uint32_t VDDA_MIN_MV = 3000;              // MCU supply is 3.3 V
 constexpr uint32_t VDDA_MAX_MV = 3600;
 constexpr int32_t GSM_CSQ_MIN = 10;                 // the antenna is a wire; below 10 (−93 dBm) is a defect
+// On LTE the N706 answers AT+CSQ with 99,99 (unknown). The signal then comes from
+// the RSRP field of AT+NETDMSG, in tenths of a dBm.
+constexpr int32_t GSM_RSRP_MIN_TENTHS_DBM = -1100;  // −110 dBm
+constexpr uint8_t GSM_RSRP_ATTEMPTS = 3;            // RSRP can be missing for a moment after registration
 // Same APN as the production firmware v2.2.0. Change it here if the bench SIMs need another one
 // (Airtel IoT, for example, may use "airteliot.com"); or build with -DQA_APN=\"…\".
 #ifndef QA_APN
@@ -86,6 +90,11 @@ constexpr uint8_t SELFTEST_SAMPLES = 5;
 constexpr uint32_t SELFTEST_SETTLE_MS = 90;          // > 4 samples at 50 Hz after a change
 constexpr uint32_t SELFTEST_SAMPLE_TIMEOUT_MS = 100;  // one sample is 20 ms at 50 Hz
 constexpr uint16_t WIFI_MIN_APS = 1;
+// The Wi-Fi scan returns ERROR while LTE is busy (right after registration, the
+// attach). Same rule as stepwhere.ino (WIFI_SCAN_QUIET_MS): scan once the link
+// has been quiet this long, and wait as long again before each retry.
+constexpr uint32_t WIFI_QUIET_MS = 12000;
+constexpr uint8_t WIFI_SCAN_ATTEMPTS = 3;
 // netloc: the board sends location uploads to the server like the production
 // firmware does, so a QA run proves board -> modem -> server -> Wi-Fi/cell
 // lookup. The server answers 201 and makes the lookups (at most 10 a board).
@@ -232,6 +241,7 @@ struct RunState {
   bool modemReady = false;
   bool batteryLow = false;   // a valid reading below BATTERY_MIN_MV: radios stay off
   bool registered = false;
+  uint32_t registeredAt = 0;  // millis() when the gsm test saw the registration
   char imei[16] = "";
 } run;
 
@@ -1222,6 +1232,7 @@ void test_gsm() {
   while (millis() - run.pwrkeyAt < GSM_REGISTER_GIVE_UP_MS && !aborted()) {
     if (at("AT+CEREG?", AT_TIMEOUT_MS, reply, sizeof(reply)) == At::Ok && parse_registered(reply)) {
       run.registered = true;
+      run.registeredAt = millis();
       break;
     }
     if (millis() - lastProgress >= 3000) {
@@ -1246,16 +1257,39 @@ void test_gsm() {
       .data().unum("limitMs", GSM_REGISTER_LIMIT_MS).end();
     return;
   }
+  const bool csqKnown = csq >= 0 && csq != 99;
+
+  // LTE: CSQ is 99, so measure the signal with RSRP from the serving cell instead.
+  bool rsrpKnown = false;
+  int32_t rsrpTenths = 0;
+  for (uint8_t attempt = 1; !csqKnown && attempt <= GSM_RSRP_ATTEMPTS && !aborted(); attempt++) {
+    ServingCell cell;
+    const char *cellError = nullptr;
+    if (at("AT+NETDMSG", AT_TIMEOUT_MS, reply, sizeof(reply)) == At::Ok && parse_netdmsg(reply, cell, cellError)
+        && cell.hasRsrp) {
+      rsrpKnown = true;
+      rsrpTenths = cell.rsrpTenthsDbm;
+      break;
+    }
+    if (attempt < GSM_RSRP_ATTEMPTS) wait_ms(1000);
+  }
+
   const bool inTime = registerMs <= GSM_REGISTER_LIMIT_MS;
-  const bool signalKnown = csq >= 0 && csq != 99;
-  const bool signalOk = signalKnown && csq >= GSM_CSQ_MIN;
   const char *error = nullptr;
   if (!inTime) error = "Registered, but slower than the limit";
-  else if (!signalKnown) error = "Registered, but signal strength unknown (CSQ 99); check the antenna wire";
-  else if (!signalOk) error = "Signal too weak (CSQ below 10); check the antenna wire and its solder joint";
+  else if (csqKnown && csq < GSM_CSQ_MIN) error = "Signal too weak (CSQ below 10); check the antenna wire and its solder joint";
+  else if (!csqKnown && !rsrpKnown) error = "Registered, but signal strength unknown (CSQ 99, no RSRP); check the antenna wire";
+  else if (!csqKnown && rsrpTenths < GSM_RSRP_MIN_TENTHS_DBM) {
+    error = "Signal too weak (RSRP below -110 dBm); check the antenna wire and its solder joint";
+  }
   QaLine line = result_line(T_GSM, error ? Outcome::Fail : Outcome::Pass, registerMs, error);
   line.data().unum("registerMs", registerMs).unum("limitMs", GSM_REGISTER_LIMIT_MS).num("csqMin", GSM_CSQ_MIN);
-  if (signalKnown) line.num("csq", csq).num("rssiDbm", -113 + 2 * csq);
+  if (csqKnown) {
+    line.str("signal", "csq").num("csq", csq).num("rssiDbm", -113 + 2 * csq);
+  } else {
+    line.str("signal", rsrpKnown ? "rsrp" : nullptr).dec("rsrpMinDbm", GSM_RSRP_MIN_TENTHS_DBM / 10.0, 1);
+    if (rsrpKnown) line.dec("rsrpDbm", rsrpTenths / 10.0, 1);
+  }
   line.end();
 }
 
@@ -1264,8 +1298,35 @@ void test_wifi() {
   const uint32_t startedAt = millis();
   char reply[AT_REPLY_CAPACITY];
   uint16_t aps = 0;
-  const At result = at("AT+WIFIAPSCAN", WIFI_SCAN_TIMEOUT_MS, reply, sizeof(reply), &aps, "+WIFIAPSCAN:");
+  At result = At::Error;
+  uint8_t attempts = 0;
+  uint32_t scanMs = 0;
+  // The link is busy right after registration: wait until it has been quiet.
+  uint32_t quietFrom = run.registered ? run.registeredAt : millis();
+  while (attempts < WIFI_SCAN_ATTEMPTS && !aborted()) {
+    const uint32_t since = millis() - quietFrom;
+    if (since < WIFI_QUIET_MS) {
+      char text[64];
+      snprintf(text, sizeof(text), "Waiting %lu s for a quiet radio · attempt %u/%u",
+               (unsigned long)((WIFI_QUIET_MS - since + 999) / 1000), (unsigned)(attempts + 1), (unsigned)WIFI_SCAN_ATTEMPTS);
+      report_progress(T_WIFI, text);
+      wait_ms(WIFI_QUIET_MS - since);
+      if (aborted()) break;
+    }
+    attempts++;
+    aps = 0;
+    const uint32_t scanStartedAt = millis();
+    result = at("AT+WIFIAPSCAN", WIFI_SCAN_TIMEOUT_MS, reply, sizeof(reply), &aps, "+WIFIAPSCAN:");
+    scanMs = millis() - scanStartedAt;
+    // Only ERROR is retried. A timeout already took 30 s and points at the modem, not a busy link.
+    if (result != At::Error) break;
+    quietFrom = millis();
+  }
   const uint32_t ms = millis() - startedAt;
+  if (aborted() && result != At::Ok) {
+    result_line(T_WIFI, Outcome::Skip, ms, "Aborted").end();
+    return;
+  }
   char sample[80] = "";
   const char *first = strstr(reply, "+WIFIAPSCAN:");
   if (first) {
@@ -1275,13 +1336,15 @@ void test_wifi() {
     sample[length] = '\0';
   }
   if (result != At::Ok) {
-    result_line(T_WIFI, Outcome::Fail, ms, result == At::Timeout ? "Wi-Fi scan timed out" : "Wi-Fi scan returned an error")
-      .data().unum("aps", aps).end();
+    result_line(T_WIFI, Outcome::Fail, ms,
+                result == At::Timeout ? "Wi-Fi scan timed out" : "Wi-Fi scan returned an error on every attempt")
+      .data().unum("aps", aps).unum("attempts", attempts).unum("scanMs", scanMs).end();
     return;
   }
   const bool ok = aps >= WIFI_MIN_APS;
   result_line(T_WIFI, ok ? Outcome::Pass : Outcome::Fail, ms, ok ? nullptr : "No access points seen (antenna, or no Wi-Fi nearby)")
-    .data().unum("aps", aps).unum("minAps", WIFI_MIN_APS).str("sample", sample[0] ? sample : nullptr).end();
+    .data().unum("aps", aps).unum("minAps", WIFI_MIN_APS).unum("attempts", attempts).unum("scanMs", scanMs)
+    .str("sample", sample[0] ? sample : nullptr).end();
 }
 
 void test_cell() {
