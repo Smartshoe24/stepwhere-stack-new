@@ -11,6 +11,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
+import { ApproximateLocationCircle } from '@/components/home/approximate-location-circle.native';
+import { ApproximateLocationNotice } from '@/components/home/approximate-location-notice';
+import { getApproximateLocation } from '@/components/home/approximate-location';
 import { ChildMapMarker } from '@/components/home/child-map-marker.native';
 import { MapControls } from '@/components/home/map-controls';
 import { darkMapStyle, lightMapStyle } from '@/components/home/map-styles';
@@ -129,6 +132,7 @@ function PastelMapComponent({
     && geofenceCenterLongitude != null,
   );
   const geofenceRingVisibleRef = React.useRef(geofenceRingVisible);
+  const approximateLocation = getApproximateLocation(selectedChild);
 
   React.useLayoutEffect(() => {
     geofenceRingVisibleRef.current = geofenceRingVisible;
@@ -235,6 +239,13 @@ function PastelMapComponent({
             trail={trail}
           />
         ) : null}
+        {showLocation && approximateLocation ? (
+          <ApproximateLocationCircle
+            latitude={selectedChild.latitude}
+            longitude={selectedChild.longitude}
+            radiusMeters={approximateLocation.radiusMeters}
+          />
+        ) : null}
         {showLocation ? (
           <ChildMapMarker
             active={active}
@@ -269,6 +280,13 @@ function PastelMapComponent({
           mapTransitionScrimStyle,
         ]}
       />
+
+      {showLocation && approximateLocation?.searching ? (
+        <ApproximateLocationNotice
+          hidden={controlsHidden}
+          topOffset={controlsTopOffset}
+        />
+      ) : null}
 
       {showLocation ? <MapControls
         hidden={controlsHidden}
