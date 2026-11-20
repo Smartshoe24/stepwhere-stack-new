@@ -60,6 +60,11 @@ const config: ExpoConfig = {
       "android.permission.SYSTEM_ALERT_WINDOW",
       "android.permission.WRITE_EXTERNAL_STORAGE",
     ],
+    // The Play Console advertising ID declaration says "Yes" (analytics is
+    // planned), and Play blocks releases whose manifest lacks this permission
+    // while the declaration says Yes. Remove this line if the declaration is
+    // ever switched back to "No".
+    permissions: ["com.google.android.gms.permission.AD_ID"],
     adaptiveIcon: {
       backgroundColor: "#FFFFFF",
       foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -94,6 +99,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "./plugins/with-gradle-memory",
+    "./plugins/with-optional-hardware-features",
     "react-native-nitro-google-signin",
     [
       "react-native-maps",
