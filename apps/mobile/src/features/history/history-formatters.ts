@@ -102,20 +102,29 @@ export function splitEventTime(iso: string) {
   return { time: match[1]!, period: match[2]!.toUpperCase() };
 }
 
+/**
+ * Durations spell out "min" and "h". A bare "m" reads as metres next to the
+ * distance figures ("450 m" vs "25m"), which made the day summary ambiguous.
+ */
 export function formatDuration(seconds: number) {
   const minutes = Math.max(0, Math.round(seconds / 60));
+
+  if (minutes === 0) {
+    return seconds > 0 ? '<1 min' : '0 min';
+  }
+
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
 
   if (hours > 0 && rest > 0) {
-    return `${hours}h ${rest}m`;
+    return `${hours} h ${rest} min`;
   }
 
   if (hours > 0) {
-    return `${hours}h`;
+    return `${hours} h`;
   }
 
-  return `${rest}m`;
+  return `${rest} min`;
 }
 
 export function formatDistance(meters: number) {

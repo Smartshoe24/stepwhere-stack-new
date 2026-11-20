@@ -87,34 +87,30 @@ export function HistoryDaySummaryCard({
           value={String(summary.placeCount)}
         />
         <View style={styles.statDivider} />
-        <SummaryStat label="Travelled" value={formatDistance(summary.distanceMeters)} />
+        <SummaryStat label="Distance" value={formatDistance(summary.distanceMeters)} />
         <View style={styles.statDivider} />
-        <SummaryStat
-          label={summary.gapSeconds > 0 ? 'No data' : 'Tracked'}
-          tone={summary.gapSeconds > 0 ? 'warning' : 'default'}
-          value={
-            summary.gapSeconds > 0
-              ? formatDuration(summary.gapSeconds)
-              : formatDuration(summary.trackedSeconds)
-          }
-        />
+        <SummaryStat label="Tracked" value={formatDuration(summary.trackedSeconds)} />
       </View>
+
+      {summary.gapSeconds > 0 ? (
+        <Text style={styles.noDataNote}>
+          {`No data for ${formatDuration(summary.gapSeconds)}`}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 function SummaryStat({
   label,
-  tone = 'default',
   value,
 }: {
   label: string;
-  tone?: 'default' | 'warning';
   value: string;
 }) {
   return (
     <View style={styles.stat}>
-      <Text style={styles.statValue(tone)}>{value}</Text>
+      <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label.toUpperCase()}</Text>
     </View>
   );
@@ -208,13 +204,20 @@ const styles = StyleSheet.create(theme => ({
     marginHorizontal: theme.spacing[3],
     backgroundColor: theme.colors.divider,
   },
-  statValue: (tone: 'default' | 'warning') => ({
-    color: tone === 'warning' ? theme.colors.telemetry.warning : theme.colors.text,
+  statValue: {
+    color: theme.colors.text,
     fontFamily: theme.typography.family.display,
     ...theme.typography.text.metric,
     ...theme.typography.tabular,
     fontWeight: theme.typography.weight.semibold,
-  }),
+  },
+  noDataNote: {
+    marginTop: theme.spacing[3],
+    color: theme.colors.telemetry.warning,
+    fontFamily: theme.typography.family.body,
+    ...theme.typography.text.meta,
+    fontWeight: theme.typography.weight.medium,
+  },
   statLabel: {
     color: theme.colors.textMuted,
     fontFamily: theme.typography.family.body,

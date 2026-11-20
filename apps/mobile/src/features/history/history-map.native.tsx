@@ -2,7 +2,7 @@ import type { ChildHistoryEventDto, HistoryCoordinateDto } from '@stepwhere/type
 
 import React from 'react';
 import { Text, View } from 'react-native';
-import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { darkMapStyle, lightMapStyle } from '@/components/home/map-styles';
@@ -13,6 +13,7 @@ import {
   getDayCoordinates,
   getEventCoordinates,
   getInitialRegion,
+  getTripEndpoints,
 } from './history-camera';
 import {
   buildStayNumbers,
@@ -165,21 +166,40 @@ function renderEventMapContent(input: {
   }
 
   if (input.event.kind === 'trip') {
-    return input.event.geometry.segments.map((segment, segmentIndex) => (
-      <Polyline
-        coordinates={segment.map(toLatLng)}
-        key={`${input.event.id}-${segmentIndex}`}
-        lineCap="round"
-        onPress={pressEvent => {
-          pressEvent.stopPropagation();
-          input.onSelectEvent(input.event);
-        }}
-        strokeColor={color}
-        strokeWidth={input.selected ? 7 : 4}
-        tappable
-        zIndex={input.selected ? 10 : 1}
-      />
-    ));
+    const tripEndpoints = getTripEndpoints(input.event);
+
+    if (!tripEndpoints) {
+      return null;
+    }
+
+    const tripEvent = input.event;
+    const pressTrip = (pressEvent: { stopPropagation: () => void }) => {
+      pressEvent.stopPropagation();
+      input.onSelectEvent(tripEvent);
+    };
+
+    // No line between the two pins. Stay pins (zIndex 5+) draw over these when a
+    // trip starts or ends at a place the child stayed.
+    return (
+      <React.Fragment key={input.event.id}>
+        <Marker
+          anchor={{ x: 0.5, y: 0.5 }}
+          coordinate={tripEndpoints.start}
+          onPress={pressTrip}
+          tracksViewChanges={false}
+          zIndex={input.selected ? 15 : 2}>
+          <View style={styles.tripStart(color, input.selected)} />
+        </Marker>
+        <Marker
+          anchor={{ x: 0.5, y: 0.5 }}
+          coordinate={tripEndpoints.end}
+          onPress={pressTrip}
+          tracksViewChanges={false}
+          zIndex={input.selected ? 15 : 2}>
+          <View style={styles.tripEnd(color, input.selected)} />
+        </Marker>
+      </React.Fragment>
+    );
   }
 
   const endpoints = [input.event.beforeCoordinate, input.event.afterCoordinate]
@@ -196,13 +216,6 @@ function renderEventMapContent(input: {
       <View style={[styles.gapMarker, { borderColor: color }]} />
     </Marker>
   ));
-}
-
-function toLatLng(coordinate: HistoryCoordinateDto) {
-  return {
-    latitude: coordinate.latitude,
-    longitude: coordinate.longitude,
-  };
 }
 
 const styles = StyleSheet.create(theme => ({
@@ -269,6 +282,24 @@ const styles = StyleSheet.create(theme => ({
     fontWeight: theme.typography.weight.bold,
     ...theme.typography.tabular,
   },
+  // Trip start: hollow ring. Trip end: filled dot. Both grow when selected.
+  tripStart: (color: string, selected: boolean) => ({
+    width: selected ? 20 : 14,
+    height: selected ? 20 : 14,
+    borderRadius: theme.radius.circle,
+    borderWidth: 3,
+    borderColor: color,
+    backgroundColor: theme.colors.surface,
+  }),
+  tripEnd: (color: string, selected: boolean) => ({
+    width: selected ? 20 : 14,
+    height: selected ? 20 : 14,
+    borderRadius: theme.radius.circle,
+    borderWidth: 3,
+    borderColor: theme.colors.surface,
+    backgroundColor: color,
+    ...theme.shadows.marker,
+  }),
   gapMarker: {
     width: 18,
     height: 18,

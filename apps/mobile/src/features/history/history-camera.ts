@@ -1,4 +1,8 @@
-import type { ChildHistoryEventDto, HistoryCoordinateDto } from '@stepwhere/types';
+import type {
+  ChildHistoryEventDto,
+  ChildHistoryTripEventDto,
+  HistoryCoordinateDto,
+} from '@stepwhere/types';
 import type { EdgePadding, Region } from 'react-native-maps';
 
 export const DEFAULT_HISTORY_REGION: Region = {
@@ -8,13 +12,37 @@ export const DEFAULT_HISTORY_REGION: Region = {
   longitudeDelta: 0.04,
 };
 
+/**
+ * A trip is shown on the map by where it started and ended, never by the path
+ * in between: the recorded path cuts through buildings and is not reliable
+ * enough to draw.
+ */
+export function getTripEndpoints(
+  event: ChildHistoryTripEventDto,
+): { start: HistoryCoordinateDto; end: HistoryCoordinateDto } | null {
+  const points = event.geometry.segments.flat();
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  if (!first || !last) {
+    return null;
+  }
+
+  return {
+    start: { latitude: first.latitude, longitude: first.longitude },
+    end: { latitude: last.latitude, longitude: last.longitude },
+  };
+}
+
 export function getEventCoordinates(event: ChildHistoryEventDto): HistoryCoordinateDto[] {
   if (event.kind === 'stay') {
     return event.place.representativeCoordinate ? [event.place.representativeCoordinate] : [];
   }
 
   if (event.kind === 'trip') {
-    return event.geometry.segments.flat();
+    const endpoints = getTripEndpoints(event);
+
+    return endpoints ? [endpoints.start, endpoints.end] : [];
   }
 
   return [event.beforeCoordinate, event.afterCoordinate].filter(Boolean) as HistoryCoordinateDto[];

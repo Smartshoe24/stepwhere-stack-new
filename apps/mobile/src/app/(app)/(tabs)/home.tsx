@@ -57,7 +57,10 @@ import {
 import { AppTabChrome } from "@/components/layout/app-child-top-chrome";
 import { useTabChrome } from "@/components/layout/tab-chrome-context";
 import { ShoeLoader } from "@/components/loading/shoe-loader";
-import type { LiveTrailSample } from "@/components/home/movement-trail-geometry";
+import {
+  HOME_PAST_LOCATION_DOTS_ENABLED,
+  type LiveTrailSample,
+} from "@/components/home/movement-trail-geometry";
 import { PastelMap } from "@/components/home/pastel-map";
 import {
   formatShareDurationLabel,
@@ -1848,6 +1851,11 @@ export default function HomeScreen() {
       childId: string,
       reason: "initial" | "throttled" | "retry" = "initial",
     ) => {
+      // The Home map no longer draws a trail, so do not download one.
+      if (!HOME_PAST_LOCATION_DOTS_ENABLED) {
+        return;
+      }
+
       if (trailRequestInFlightRef.current.has(childId)) {
         return;
       }
@@ -1937,7 +1945,12 @@ export default function HomeScreen() {
   useEffect(() => {
     clearTrailRefreshTimer();
 
-    if (!isHomeFocused || !selectedChild || !selectedChildTrailKey) {
+    if (
+      !HOME_PAST_LOCATION_DOTS_ENABLED ||
+      !isHomeFocused ||
+      !selectedChild ||
+      !selectedChildTrailKey
+    ) {
       lastTrailCoordinateKeyRef.current = null;
       return;
     }
