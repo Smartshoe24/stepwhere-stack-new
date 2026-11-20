@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import React from "react";
-import { Text, View, type View as NativeView } from "react-native";
+import { Pressable, Text, View, type View as NativeView } from "react-native";
 import Animated, {
   cancelAnimation,
   runOnJS,
@@ -13,7 +13,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { ShoeHelpSheet } from "@/components/home/shoe-help-sheet";
 import { AppIcon } from "@/components/ui/app-icon";
+import {
+  FIRST_CONNECTION_EXPECTED_MINUTES,
+  FIRST_CONNECTION_EXPECTED_MS,
+} from "@/features/overview/shoe-connection";
 
 type FirstLocationGateProps = {
   blurTarget: React.RefObject<NativeView | null>;
@@ -21,6 +26,8 @@ type FirstLocationGateProps = {
   childName: string;
   gsmConnected: boolean;
   locationReceived: boolean;
+  /** The shoe has never sent a report, so it is most likely not charged. */
+  neverConnected?: boolean;
   onVisibilityChange?: (visible: boolean) => void;
   protectedTopOffset?: number;
   topInset?: number;
@@ -43,6 +50,7 @@ export function FirstLocationGate({
   childName,
   gsmConnected,
   locationReceived,
+  neverConnected = false,
   onVisibilityChange,
   protectedTopOffset = 0,
   topInset = 0,
@@ -56,6 +64,8 @@ export function FirstLocationGate({
   const exitStartedRef = React.useRef(false);
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const overlayOpacity = useSharedValue(1);
+  const [isHelpVisible, setIsHelpVisible] = React.useState(false);
+  const [stillWaiting, setStillWaiting] = React.useState(false);
   const firstName = childName.trim().split(/\s+/)[0] || childName;
   const blurTint = rt.themeName === "dark" ? "dark" : "light";
 
@@ -106,6 +116,18 @@ export function FirstLocationGate({
     );
   }, [gsmConnected, locationReceived, overlayOpacity, reduceMotion, visible]);
 
+  // After the time a first connection normally takes, say more than "wait".
+  React.useEffect(() => {
+    if (!neverConnected) {
+      setStillWaiting(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setStillWaiting(true), FIRST_CONNECTION_EXPECTED_MS);
+
+    return () => clearTimeout(timer);
+  }, [neverConnected]);
+
   React.useEffect(
     () => () => {
       for (const timer of timersRef.current) {
@@ -149,28 +171,65 @@ export function FirstLocationGate({
         tint={blurTint}
       />
       <View style={styles.cardRegion(protectedTopOffset)}>
-        <View style={styles.card}>
-          <Text style={styles.title}>
-            {`Getting ${firstName}'s location ready`}
-          </Text>
-          <View style={styles.steps}>
-            <LocationStatusRow
-              complete={shoeComplete}
-              label="Shoe connected"
-            />
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={styles.connector(shoeComplete)}
-            />
-            <LocationStatusRow
-              complete={locationComplete}
-              label="Live location received"
-            />
+        {neverConnected ? (
+          <View style={styles.card}>
+            <Text style={styles.title}>{`Waiting for ${firstName}'s shoe`}</Text>
+            <Text style={styles.body}>
+              The shoe hasn't connected yet. New shoes usually need to be charged first.
+            </Text>
+            <View style={styles.checklist}>
+              <ChecklistRow index={1} label="Charge the shoe fully" />
+              <ChecklistRow index={2} label="Switch it on" />
+              <ChecklistRow index={3} label="Take it outside or near a window" />
+            </View>
+            <Text style={styles.note}>
+              {stillWaiting
+                ? "Still not connected? Charge it fully, then switch it off and on again. If that doesn't help, contact support."
+                : `The first connection can take 10 to ${FIRST_CONNECTION_EXPECTED_MINUTES} minutes.`}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsHelpVisible(true)}
+              style={({ pressed }) => [styles.helpButton, pressed && styles.pressed]}>
+              <Text style={styles.helpLabel}>Why isn't it connecting?</Text>
+            </Pressable>
           </View>
-        </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.title}>
+              {`Getting ${firstName}'s location ready`}
+            </Text>
+            <View style={styles.steps}>
+              <LocationStatusRow
+                complete={shoeComplete}
+                label="Shoe connected"
+              />
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={styles.connector(shoeComplete)}
+              />
+              <LocationStatusRow
+                complete={locationComplete}
+                label="Live location received"
+              />
+            </View>
+          </View>
+        )}
       </View>
+      <ShoeHelpSheet onClose={() => setIsHelpVisible(false)} visible={isHelpVisible} />
     </Animated.View>
+  );
+}
+
+function ChecklistRow({ index, label }: { index: number; label: string }) {
+  return (
+    <View style={styles.checklistRow}>
+      <View style={styles.checklistNumber}>
+        <Text style={styles.checklistNumberText}>{index}</Text>
+      </View>
+      <Text style={styles.checklistLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -279,6 +338,71 @@ const styles = StyleSheet.create((theme) => ({
   },
   steps: {
     marginTop: theme.spacing[4],
+  },
+  body: {
+    marginTop: theme.spacing[2],
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    fontFamily: theme.typography.family.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  checklist: {
+    marginTop: theme.spacing[4],
+    gap: theme.spacing[3],
+  },
+  checklistRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[3],
+  },
+  checklistNumber: {
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.circle,
+    borderWidth: 1,
+    borderColor: theme.colors.chrome.cardBorder,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  checklistNumberText: {
+    color: theme.colors.text,
+    fontFamily: theme.typography.family.body,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: theme.typography.weight.semibold,
+  },
+  checklistLabel: {
+    flex: 1,
+    color: theme.colors.text,
+    fontFamily: theme.typography.family.body,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: theme.typography.weight.medium,
+  },
+  note: {
+    marginTop: theme.spacing[4],
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    fontFamily: theme.typography.family.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  helpButton: {
+    marginTop: theme.spacing[3],
+    alignSelf: "center",
+    paddingVertical: theme.spacing[1],
+  },
+  helpLabel: {
+    color: theme.colors.primaryGreen,
+    fontFamily: theme.typography.family.body,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: theme.typography.weight.semibold,
+  },
+  pressed: {
+    opacity: theme.colors.button.pressedOpacity,
   },
   statusRow: {
     minHeight: 44,
