@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { AppIcon } from '@/components/ui/app-icon';
 
-const SUPPORT_PHONE = '4444444444';
+const SUPPORT_PHONE = '9358688768';
 const SUPPORT_EMAIL = 'support@stepwhere.app';
 
 export function showSupportOptions() {
