@@ -3552,6 +3552,7 @@ export default function HomeScreen() {
             gsmConnected={selectedChild.connectivity.gsmState === "connected"}
             key={selectedChild.id}
             locationReceived={selectedChild.hasLocationFix}
+            neverConnected={selectedChild.connectionKind === "never_connected"}
             onVisibilityChange={setFirstLocationGateVisible}
             protectedTopOffset={topBarHeight + secondaryTopChromeHeight}
             topInset={0}

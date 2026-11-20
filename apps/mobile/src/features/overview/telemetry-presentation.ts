@@ -8,6 +8,8 @@ import {
 
 import type { AppIconName } from "@/components/ui/app-icon";
 
+import type { ShoeConnectionKind } from "./shoe-connection";
+
 export type TelemetryTone =
   | "positive"
   | "warning"
@@ -104,6 +106,7 @@ export function getSignalPresentation(
 
 export function getStatusPresentation(
   telemetryState: ChildTelemetryState,
+  connectionKind: ShoeConnectionKind = 'online',
 ): TelemetryPresentation {
   switch (telemetryState) {
     case "offline":
@@ -120,7 +123,11 @@ export function getStatusPresentation(
       };
     case "connecting":
       return {
-        label: "Connecting",
+        label: connectionKind === "never_connected"
+          ? "Not connected"
+          : connectionKind === "reconnecting"
+            ? "Reconnecting"
+            : "Connecting",
         statusSymbol: "exclamation",
         tone: "warning",
       };

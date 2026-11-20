@@ -2,6 +2,8 @@ import React from "react";
 import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { ShoeConnectionNotice } from "@/components/home/shoe-connection-notice";
+import { ShoeHelpSheet } from "@/components/home/shoe-help-sheet";
 import { TelemetryItem } from "@/components/home/telemetry-item";
 import { TelemetryStatusIcon } from "@/components/home/telemetry-status-icon";
 import type { OverviewChildCard } from "@/features/overview/overview-ui";
@@ -28,9 +30,15 @@ export function TelemetryBar({ selectedChild }: TelemetryBarProps) {
     satelliteCount: selectedChild.satelliteCount,
     telemetryState: selectedChild.telemetryState,
   });
-  const status = getStatusPresentation(selectedChild.telemetryState);
+  const connectionKind = selectedChild.connectionKind;
+  const status = getStatusPresentation(selectedChild.telemetryState, connectionKind);
+  const [isHelpVisible, setIsHelpVisible] = React.useState(false);
+  const noticeKind = connectionKind === "offline" || connectionKind === "offline_low_battery"
+    ? connectionKind
+    : null;
 
   return (
+    <View>
     <View style={styles.container}>
       <View style={styles.column}>
         <TelemetryItem
@@ -68,6 +76,16 @@ export function TelemetryBar({ selectedChild }: TelemetryBarProps) {
           valueColor={getToneColor(theme, status.tone)}
         />
       </View>
+    </View>
+    {noticeKind ? (
+      <ShoeConnectionNotice
+        batteryPercent={selectedChild.batteryPercent}
+        childName={selectedChild.name}
+        kind={noticeKind}
+        onHelpPress={() => setIsHelpVisible(true)}
+      />
+    ) : null}
+    <ShoeHelpSheet onClose={() => setIsHelpVisible(false)} visible={isHelpVisible} />
     </View>
   );
 }

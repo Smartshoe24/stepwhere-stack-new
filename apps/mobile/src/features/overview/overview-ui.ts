@@ -4,6 +4,7 @@ import type {
   OverviewChildDto,
 } from "@stepwhere/types";
 
+import { getShoeConnectionKind, type ShoeConnectionKind } from "./shoe-connection";
 import { getEffectiveTelemetryState } from "./telemetry-presentation";
 
 export type AvatarTone = "mint" | "amber" | "blue" | "rose";
@@ -11,6 +12,8 @@ export type AvatarTone = "mint" | "amber" | "blue" | "rose";
 export type OverviewChildCard = OverviewChildDto & {
   avatarTone: AvatarTone;
   batteryText: string;
+  /** Why the shoe looks disconnected, worked out from the raw server data. */
+  connectionKind: ShoeConnectionKind;
   hasLocationFix: boolean;
   latitude: number;
   locationSource: LocationSource | null;
@@ -57,6 +60,7 @@ export function toOverviewChildCard(
     batteryText: child.batteryPercent !== null && child.batteryPercent !== undefined
       ? `${child.batteryPercent}%`
       : "No data",
+    connectionKind: getShoeConnectionKind({ ...child, telemetryState }),
     hasLocationFix,
     latitude: resolvedLatitude ?? DEFAULT_CHILD_COORDINATES.latitude,
     locationSource: child.resolvedPosition?.source ?? (hasLocationFix ? "gps" : null),
@@ -72,6 +76,16 @@ export function toOverviewChildCard(
 
 function getStatusLabel(child: OverviewChildDto, telemetryState: OverviewChildCard["telemetryState"]) {
   if (telemetryState === "connecting") {
+    const kind = getShoeConnectionKind({ ...child, telemetryState });
+
+    if (kind === "never_connected") {
+      return "Not connected yet";
+    }
+
+    if (kind === "reconnecting") {
+      return "Reconnecting";
+    }
+
     return "Connecting";
   }
 

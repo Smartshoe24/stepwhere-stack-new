@@ -7,27 +7,29 @@ import { AppIcon } from '@/components/ui/app-icon';
 const SUPPORT_PHONE = '4444444444';
 const SUPPORT_EMAIL = 'support@stepwhere.app';
 
+export function showSupportOptions() {
+  Alert.alert('Contact support', 'How would you like to reach us?', [
+    {
+      text: 'Call us',
+      onPress: () => {
+        void Linking.openURL(`tel:${SUPPORT_PHONE}`);
+      },
+    },
+    {
+      text: 'Mail us',
+      onPress: () => {
+        void Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
+      },
+    },
+    {
+      text: 'Cancel',
+      style: 'cancel',
+    },
+  ]);
+}
+
 export function CustomerSupportCard() {
-  function handleContactPress() {
-    Alert.alert('Contact support', 'How would you like to reach us?', [
-      {
-        text: 'Call us',
-        onPress: () => {
-          void Linking.openURL(`tel:${SUPPORT_PHONE}`);
-        },
-      },
-      {
-        text: 'Mail us',
-        onPress: () => {
-          void Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
-        },
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-    ]);
-  }
+  const handleContactPress = showSupportOptions;
 
   return (
     <Pressable
