@@ -179,12 +179,11 @@ export function FirstLocationGate({
             </Text>
             <View style={styles.checklist}>
               <ChecklistRow index={1} label="Charge the shoe fully" />
-              <ChecklistRow index={2} label="Switch it on" />
-              <ChecklistRow index={3} label="Take it outside or near a window" />
+              <ChecklistRow index={2} label="Take it outside or near a window" />
             </View>
             <Text style={styles.note}>
               {stillWaiting
-                ? "Still not connected? Charge it fully, then switch it off and on again. If that doesn't help, contact support."
+                ? "Still not connected? Make sure the shoe is fully charged and give it a few more minutes. If that doesn't help, contact support."
                 : `The first connection can take 10 to ${FIRST_CONNECTION_EXPECTED_MINUTES} minutes.`}
             </Text>
             <Pressable

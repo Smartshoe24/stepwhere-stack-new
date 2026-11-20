@@ -14,7 +14,6 @@ type ShoeHelpSheetProps = {
 
 const STEPS = [
   'Charge the shoe fully.',
-  'Switch it on.',
   'Take it outside or near a window so it can find a signal.',
   `Wait up to ${FIRST_CONNECTION_EXPECTED_MINUTES} minutes. The first connection can take that long.`,
 ];

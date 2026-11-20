@@ -25,7 +25,7 @@ function ShoeConnectionNoticeComponent({
   const lowBattery = kind === 'offline_low_battery';
   const message = lowBattery
     ? `Last seen at ${batteryPercent ?? 0}%. The battery may be empty. Charge ${firstName}'s shoe.`
-    : `${firstName}'s shoe is offline. Make sure it's switched on and charged.`;
+    : `${firstName}'s shoe is offline. Make sure it's charged.`;
 
   return (
     <View style={styles.container}>

@@ -27,7 +27,7 @@ type ShoeConnectionInput = {
 };
 
 /**
- * "Connecting" used to cover both a shoe that was never switched on and one that
+ * "Connecting" used to cover both a shoe that never connected and one that
  * dropped signal for a minute. Those need different messages, so this separates
  * them. Only the app-visible facts are used: when the shoe was last heard from,
  * the effective telemetry state, and the last battery reading.
