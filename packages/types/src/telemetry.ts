@@ -1,5 +1,6 @@
 import type { ChildSummaryDto } from "./children";
 import type { PaginatedResponse } from "./common";
+import type { QaBoardTestId } from "./qa-tests";
 
 /** Existing mobile freshness policy, shared so server and admin cannot drift. */
 export const TELEMETRY_STALE_AFTER_MS = 60 * 1_000;
@@ -200,12 +201,28 @@ export type FirmwareStatusInput = {
   uid?: string;
 };
 
+/** A board test's status as the QA firmware sends it in its uploads. */
+export type QaTelemetryTestStatus = "pass" | "fail" | "skip" | "running" | "pending";
+
 /** Sent by the QA firmware's netloc test instead of the fw block. */
 export type QaTelemetryInput = {
   /** STM32 chip UID, 24 hex characters. */
   uid: string;
   /** QA firmware version, e.g. "qa-0.7.0". */
   fw: string;
+  /**
+   * qa-0.7.4 and later: the board test results travel with the uploads, so a
+   * board without TTL still gets its Board tests recorded.
+   * `s` is a random ID per boot (8 hex characters) and `run` the run number since boot.
+   */
+  s?: string;
+  run?: number;
+  /** Test ID to status, for the tests of this run. */
+  results?: Partial<Record<QaBoardTestId, QaTelemetryTestStatus>>;
+  /** Shortened error texts of failed or skipped tests (last upload only). */
+  errors?: Partial<Record<QaBoardTestId, string>>;
+  /** True on the upload sent after the last test finished. */
+  done?: boolean;
 };
 
 export type LocationTelemetryInput = {

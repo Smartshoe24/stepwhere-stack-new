@@ -134,6 +134,8 @@ export type QaTestRunDto = {
   chipUid: string;
   firmwareVersion: string;
   runNumber: number;
+  /** "ttl": read on the Bench serial console; "network": sent in the board's uploads (no TTL). */
+  source: "ttl" | "network";
   status: QaTestRunStatus;
   results: QaTestResultDto[];
   passed: number;

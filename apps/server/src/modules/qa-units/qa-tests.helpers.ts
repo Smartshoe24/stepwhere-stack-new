@@ -2,6 +2,8 @@ import { z } from "zod";
 import { QA_BOARD_TEST_IDS, QA_TTL_PREFIX, QA_TTL_PROTOCOL_VERSION } from "@stepwhere/types";
 import type {
   QaBoardTestId,
+  QaTelemetryInput,
+  QaTelemetryTestStatus,
   QaTestResultDto,
   QaTestResultStatus,
   QaTtlMessage,
@@ -159,6 +161,47 @@ export function applyTtlMessage(results: QaTestResultDto[], message: QaTtlMessag
       startedAt: entry.startedAt ?? now,
       finishedAt: now,
     };
+  });
+}
+
+const STATUS_FROM_UPLOAD: Record<QaTelemetryTestStatus, QaTestResultStatus> = {
+  pass: "passed",
+  fail: "failed",
+  skip: "skipped",
+  running: "running",
+  pending: "pending",
+};
+
+/**
+ * A run's results from the "qa" block of an upload (qa-0.7.4 and later). Each
+ * upload carries the status of every test so far, so it replaces the previous
+ * one; times stay from the upload that first saw a test finished.
+ */
+export function applyUploadResults(previous: QaTestResultDto[], qa: QaTelemetryInput, at: Date): QaTestResultDto[] {
+  const now = at.toISOString();
+
+  return QA_BOARD_TEST_IDS.flatMap((id) => {
+    const reported = qa.results?.[id];
+
+    if (!reported) {
+      return [];
+    }
+
+    const before = previous.find((entry) => entry.id === id) ?? emptyResults([id])[0]!;
+    const status = STATUS_FROM_UPLOAD[reported];
+    const finished = status === "passed" || status === "failed" || status === "skipped";
+    const sameAsBefore = before.status === status && before.finishedAt !== null;
+
+    return [{
+      ...before,
+      status,
+      error: qa.errors?.[id] ?? (finished && sameAsBefore ? before.error : null),
+      progress: null,
+      prompt: null,
+      awaiting: null,
+      startedAt: before.startedAt ?? (status === "pending" ? null : now),
+      finishedAt: finished ? (sameAsBefore ? before.finishedAt : now) : null,
+    }];
   });
 }
 

@@ -33,6 +33,7 @@ const run = (results: QaTestResultDto[], status: QaTestRunDto['status']): QaTest
   stationName: 'Bench 1',
   serialPath: '/dev/ttyUSB0',
   slotId: 'slot-1',
+  source: 'ttl',
   chipUid: '005500313434510231303739',
   firmwareVersion: 'qa-0.2.0',
   runNumber: 1,

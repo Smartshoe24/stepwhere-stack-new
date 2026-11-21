@@ -5,10 +5,14 @@
  *
  * - A board whose QA unit is before Ready to ship: the upload is stored in
  *   qa_unit_reports and the device gets 201.
- * - A never-seen board (no QA unit for its IMEI, never bound to a child, IMEI
- *   of our modem model, at most 30 new boards an hour) is added to the device
- *   list, and to the QA list when the upload carries its chip UID.
+ * - A board with no QA unit for its IMEI (IMEI of our modem model, at most 30
+ *   new boards an hour) is added to the device list, and to the QA list when
+ *   the upload carries its chip UID. A device that was bound to a child before
+ *   is added only from QA firmware uploads (flashed by cable on purpose);
+ *   a device bound now never is.
  * - QA firmware uploads get up to 10 Wi-Fi/cell lookups, 30 s apart.
+ * - qa-0.7.4 uploads also carry the board test results: they are recorded as
+ *   a board test run (qa-tests.service.ts recordUploadedRun).
  */
 import { and, asc, count, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import type { LocationTelemetryInput, QaTestLogDto, QaTestReportDto } from "@stepwhere/types";
@@ -22,6 +26,7 @@ import { GoogleGeolocationRequestError, locateFromCellTowers } from "../telemetr
 import { getEligibleWifiAccessPoints } from "../telemetry/wifi-geolocation";
 import {
   acceptsTestReports,
+  autoRegisterAllowedForBindings,
   autoRegisterStage,
   imeiHasAllowedTac,
   networkLookupDue,
@@ -37,6 +42,8 @@ import { finalTestSteps } from "./qa-motion.helpers";
 import { broadcastUnitChanged } from "./qa-units.realtime";
 import { normalizeImei, shortChipUid } from "./qa-units.helpers";
 import { addEvent, ensureDeviceForImei } from "./qa-units.service";
+import { recordUploadedRun } from "./qa-tests.service";
+import { getSafeErrorDetails } from "../../shared/background-task";
 
 type UnitRow = typeof qaUnits.$inferSelect;
 
@@ -96,6 +103,13 @@ export async function recordTestReport(hardwareIdentifier: string, input: Locati
     }).where(eq(devices.id, unit.deviceId));
   }
 
+  // qa-0.7.4: the board test results come with the upload, for boards without TTL.
+  if (input.qa?.results) {
+    await recordUploadedRun(unit.id, input.qa, now).catch((error) => {
+      console.error("[qa-test-log] could not record the uploaded board tests", getSafeErrorDetails(error));
+    });
+  }
+
   if (lookup.location && !unit.networkLocatedAt) {
     await addEvent(db, {
       unitId: unit.id,
@@ -114,10 +128,12 @@ async function autoRegister(imei: string, input: LocationTelemetryInput): Promis
   if (!imeiHasAllowedTac(imei, env.QA_AUTO_REGISTER_TACS)) return null;
 
   const [device] = await db.select({ id: devices.id }).from(devices).where(eq(devices.hardwareIdentifier, imei)).limit(1);
+  let wasBound = false;
   if (device) {
-    const [binding] = await db.select({ id: childDeviceBindings.id }).from(childDeviceBindings)
-      .where(eq(childDeviceBindings.deviceId, device.id)).limit(1);
-    if (binding) return null;   // a customer's device once: never treated as a test board
+    const bindings = await db.select({ unboundAt: childDeviceBindings.unboundAt }).from(childDeviceBindings)
+      .where(eq(childDeviceBindings.deviceId, device.id));
+    wasBound = bindings.length > 0;
+    if (!autoRegisterAllowedForBindings(bindings, Boolean(input.qa))) return null;
   }
 
   const [recent] = await db.select({ n: count() }).from(qaUnitEvents).where(and(
@@ -158,10 +174,10 @@ async function autoRegister(imei: string, input: LocationTelemetryInput): Promis
     await addEvent(tx, {
       unitId: created.id,
       kind: "registered",
-      message: `Registered from its first upload (chip ${shortChipUid(chipUid)}, IMEI ${imei}, ${reportFirmware(input) ?? "unknown firmware"}).`,
+      message: `Registered from its first upload (chip ${shortChipUid(chipUid)}, IMEI ${imei}, ${reportFirmware(input) ?? "unknown firmware"})${wasBound ? "; it was bound to a child before" : ""}.`,
       stage,
       stageStatus: "pending",
-      data: { chipUid, imei, source: QA_AUTO_REGISTER_SOURCE },
+      data: { chipUid, imei, source: QA_AUTO_REGISTER_SOURCE, wasBound },
     });
     return created;
   });

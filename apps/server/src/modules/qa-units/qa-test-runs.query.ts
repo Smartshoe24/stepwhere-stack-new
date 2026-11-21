@@ -25,6 +25,7 @@ export function toRunDto(run: RunRow, stationName: string | null): QaTestRunDto 
     chipUid: run.chipUid,
     firmwareVersion: run.firmwareVersion,
     runNumber: run.runNumber,
+    source: run.networkSession ? "network" : "ttl",
     status: run.status,
     // Runs recorded before the Start prompt existed have no `awaiting`.
     results: run.results.map((entry) => ({ ...entry, awaiting: entry.awaiting ?? null })),
