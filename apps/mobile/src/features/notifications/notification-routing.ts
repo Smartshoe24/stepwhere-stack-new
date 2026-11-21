@@ -20,3 +20,14 @@ export function getChildIdFromNotificationResponse(
 ) {
   return getChildIdFromNotificationData(response?.notification.request.content.data);
 }
+
+/** Billing pushes carry `{ route: "/billing", billingKey }` and no child. */
+export function isBillingNotificationData(value: unknown) {
+  return extractData(value)?.route === '/billing';
+}
+
+export function isBillingNotificationResponse(
+  response: Notifications.NotificationResponse | null | undefined,
+) {
+  return isBillingNotificationData(response?.notification.request.content.data);
+}

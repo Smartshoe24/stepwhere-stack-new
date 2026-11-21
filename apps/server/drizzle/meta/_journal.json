@@ -162,6 +162,20 @@
       "when": 1794747895787,
       "tag": "0022_qa_test_log",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794747955787,
+      "tag": "0023_billing_reset",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794748015787,
+      "tag": "0024_cashfree_billing",
+      "breakpoints": true
     }
   ]
 }

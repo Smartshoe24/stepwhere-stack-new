@@ -150,6 +150,9 @@ const config: ExpoConfig = {
   },
 
   extra: {
+    // Read at runtime to keep dev-only tools (the fake payment sheet) out of
+    // production builds, which also run with __DEV__ false.
+    appVariant: APP_VARIANT,
     router: {},
     eas: {
       projectId: EAS_PROJECT_ID,

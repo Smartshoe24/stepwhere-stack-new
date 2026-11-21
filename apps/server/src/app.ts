@@ -47,7 +47,7 @@ import {
 } from "./modules/telemetry/telemetry.routes";
 import { uploadsRoutes } from "./modules/uploads/uploads.routes";
 import { usersRoutes } from "./modules/users/users.routes";
-import { billingRoutes, billingWebhookRoutes, purchaserBillingRoutes } from "./modules/billing/billing.routes";
+import { billingRoutes, billingWebhookRoutes } from "./modules/billing/billing.routes";
 import { billingAdminRoutes } from "./modules/billing/billing-admin.routes";
 import { getSafeErrorDetails } from "./shared/background-task";
 
@@ -152,7 +152,6 @@ authenticatedV1App.route("/", authenticatedSharesRoutes);
 authenticatedV1App.route("/", uploadsRoutes);
 authenticatedV1App.route("/", pushRoutes);
 authenticatedV1App.route("/", placesRoutes);
-authenticatedV1App.route("/", purchaserBillingRoutes);
 
 familyV1App.use("*", authMiddleware);
 familyV1App.use("*", familyMemberMiddleware);

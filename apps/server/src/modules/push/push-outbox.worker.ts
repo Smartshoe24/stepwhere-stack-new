@@ -97,9 +97,10 @@ class PushOutboxWorker {
         to: row.installation.expoPushToken,
         title: row.notification.title,
         body: row.notification.body,
-        sound: GEOFENCE_NOTIFICATION_SOUND,
-        priority: "high" as const,
-        channelId: GEOFENCE_NOTIFICATION_CHANNEL_ID,
+        // Billing reminders use the normal sound, never the safety alarm channel.
+        ...(row.notification.type === "billing"
+          ? { sound: "default" as const, priority: "default" as const }
+          : { sound: GEOFENCE_NOTIFICATION_SOUND, priority: "high" as const, channelId: GEOFENCE_NOTIFICATION_CHANNEL_ID }),
         badge: unreadCountByUserId.get(row.notification.userId) ?? 0,
         data: row.notification.data ?? {},
       }));

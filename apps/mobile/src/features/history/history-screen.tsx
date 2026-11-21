@@ -22,6 +22,10 @@ import { useNativeTabVisibility } from '@/components/navigation/native-tab-visib
 import { getRuntimeThemeName } from '@/components/theme/switch-runtime-theme';
 import { useThemeTransition } from '@/components/theme/use-theme-transition';
 import { useAuth } from '@/features/auth/use-auth';
+import { isSubscriptionRequiredError } from '@/features/billing/billing-errors';
+import { reportSubscriptionRequired } from '@/features/billing/subscription-lock';
+import { SubscriptionLockedCard } from '@/features/billing/subscription-locked-card';
+import { useChildSubscriptionLock } from '@/features/billing/use-child-subscription-lock';
 import {
   useChildHistoryDayQuery,
   useChildHistoryRangeQuery,
@@ -116,6 +120,9 @@ export function HistoryScreen() {
   });
   const events = React.useMemo(() => historyQuery.data?.events ?? [], [historyQuery.data?.events]);
   const queryError = historyQuery.error ?? rangeQuery.error;
+  // Billing locks are per child; a covered sibling's history still works.
+  const subscriptionLock = useChildSubscriptionLock(selectedChild?.id ?? null, queryError);
+  const isLocked = Boolean(selectedChild && subscriptionLock.locked);
   const errorMessage = queryError instanceof Error
     ? queryError.message
     : queryError
@@ -149,6 +156,12 @@ export function HistoryScreen() {
   React.useEffect(() => {
     setHidden(false);
   }, [setHidden]);
+
+  React.useEffect(() => {
+    if (selectedChild && isSubscriptionRequiredError(queryError)) {
+      reportSubscriptionRequired(selectedChild.id);
+    }
+  }, [queryError, selectedChild]);
 
   React.useEffect(() => {
     if (sourceState.kind !== 'mismatch' || !selectedChild) {
@@ -241,7 +254,16 @@ export function HistoryScreen() {
               <Text style={styles.headerTitle}>History</Text>
             </View>
 
-            {selectedChild ? (
+            {isLocked && selectedChild ? (
+              <SubscriptionLockedCard
+                childName={selectedChild.name.split(/\s+/)[0] ?? selectedChild.name}
+                lock={subscriptionLock}
+                style={styles.lockedCard}
+                variant="history"
+              />
+            ) : null}
+
+            {selectedChild && !isLocked ? (
               <HistoryDateControl
                 canGoNext={date < maxDate}
                 canGoPrevious={Boolean(firstDate && date > firstDate)}
@@ -273,9 +295,9 @@ export function HistoryScreen() {
               />
             ) : null}
 
-            {viewState.kind === 'loading' ? <HistoryLoadingState /> : null}
+            {!isLocked && viewState.kind === 'loading' ? <HistoryLoadingState /> : null}
 
-            {viewState.kind === 'error' ? (
+            {!isLocked && viewState.kind === 'error' ? (
               <HistoryErrorState
                 message={viewState.message}
                 onRetry={() => {
@@ -284,7 +306,7 @@ export function HistoryScreen() {
               />
             ) : null}
 
-            {viewState.kind === 'no-history' ? (
+            {!isLocked && viewState.kind === 'no-history' ? (
               <HistoryEmptyState
                 body={`Once ${selectedChild?.name ?? 'your child'}’s tracker records location data, stops and journeys will show up here.`}
                 icon="shoe"
@@ -292,7 +314,7 @@ export function HistoryScreen() {
               />
             ) : null}
 
-            {viewState.kind === 'empty-day' ? (
+            {!isLocked && viewState.kind === 'empty-day' ? (
               <HistoryEmptyState
                 action={viewState.lastDataDate ? {
                   label: `Go to ${formatDateLabel(viewState.lastDataDate, today)}`,
@@ -304,7 +326,7 @@ export function HistoryScreen() {
               />
             ) : null}
 
-            {viewState.kind === 'ready' ? (
+            {!isLocked && viewState.kind === 'ready' ? (
               <>
                 <HistoryDaySummaryCard
                   onSelectEventId={setSelectedEventId}
@@ -328,7 +350,7 @@ export function HistoryScreen() {
           </ScrollView>
         </BlurTargetView>
 
-        {selectedChild ? (
+        {selectedChild && !isLocked ? (
           <FirstLocationGate
             blurTarget={firstLocationBlurTargetRef}
             childId={selectedChild.id}
@@ -418,6 +440,10 @@ const styles = StyleSheet.create(theme => ({
   header: {
     marginTop: theme.spacing[4],
     marginHorizontal: theme.spacing[5],
+  },
+  lockedCard: {
+    marginTop: theme.spacing[4],
+    marginHorizontal: theme.spacing[4],
   },
   headerTitle: {
     color: theme.colors.text,

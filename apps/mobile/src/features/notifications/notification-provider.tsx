@@ -2,10 +2,13 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React from 'react';
 import { AppState, Linking, Platform } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
 import { useAuth } from '@/features/auth/use-auth';
-import { deletePushInstallation, registerCurrentPushInstallation } from '@/lib/api-client';
+import { billingRoutes } from '@/features/billing/billing-routes';
+import { deletePushInstallation, getBillingOverview, registerCurrentPushInstallation } from '@/lib/api-client';
+import { queryKeys } from '@/query/query-keys';
 import {
   getOrCreatePushInstallationId,
   hasShownNotificationPermissionPrompt,
@@ -20,7 +23,7 @@ import {
   requestNotificationPermission as requestSystemNotificationPermission,
   type NotificationPermissionState,
 } from './notification-registration';
-import { getChildIdFromNotificationResponse } from './notification-routing';
+import { getChildIdFromNotificationResponse, isBillingNotificationResponse } from './notification-routing';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -46,6 +49,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const auth = useAuth();
   const signedInUserId = auth.user?.id ?? null;
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const organizationId = auth.user?.family.organization?.id ?? null;
   const [permissionState, setPermissionState] = React.useState<NotificationPermissionState>('undetermined');
   const [registrationState, setRegistrationState] = React.useState<'idle' | 'registering' | 'registered' | 'error'>('idle');
   const [registrationError, setRegistrationError] = React.useState<string | null>(null);
@@ -66,6 +71,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       },
     });
   }, [router]);
+
+  // Billing pushes open Subscription, or Choose a plan when there's no live plan.
+  const navigateToBilling = React.useCallback(async () => {
+    try {
+      const overview = await queryClient.fetchQuery({
+        queryKey: queryKeys.billingOverview(organizationId),
+        queryFn: ({ signal }) => getBillingOverview({ operationName: 'getBillingOverview', signal }),
+        staleTime: 0,
+      });
+      const subscription = overview.subscription;
+      const hasLivePlan = Boolean(subscription && subscription.state !== 'expired' && subscription.state !== 'revoked');
+
+      router.navigate(hasLivePlan || !overview.purchasesEnabled ? billingRoutes.subscription() : billingRoutes.choosePlan());
+    } catch {
+      router.navigate(billingRoutes.subscription());
+    }
+  }, [organizationId, queryClient, router]);
+
+  const handleNotificationResponse = React.useCallback((response: Notifications.NotificationResponse) => {
+    if (isBillingNotificationResponse(response)) {
+      void navigateToBilling();
+      return;
+    }
+
+    navigateFromNotification(getChildIdFromNotificationResponse(response));
+  }, [navigateFromNotification, navigateToBilling]);
 
   const performPushRegistration = React.useCallback(async () => {
     if (auth.status !== 'signedIn' || !auth.onboardingCompleted || !signedInUserId) {
@@ -161,22 +192,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [syncPushRegistration]);
 
   React.useEffect(() => {
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      navigateFromNotification(getChildIdFromNotificationResponse(response));
-    });
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
 
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (!response) {
         return;
       }
 
-      navigateFromNotification(getChildIdFromNotificationResponse(response));
+      handleNotificationResponse(response);
     });
 
     return () => {
       responseSubscription.remove();
     };
-  }, [navigateFromNotification]);
+  }, [handleNotificationResponse]);
 
   React.useEffect(() => {
     if (auth.status !== 'signedOut' || !installationIdRef.current) {

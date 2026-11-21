@@ -1,256 +1,153 @@
-# Family subscriptions: backend rollout
+# Family billing: backend
 
-## Scope and launch status
+How the server sells and enforces the family plan. The plan and its reasoning
+are in `billing-cashfree-plan.md`; the screens are in
+`design/billing-cashfree-mockups.html`; your setup steps are in
+`billing-setup-guide.md`.
 
-Implemented: durable family shoe ownership; immutable 30-day physical-device
-trials; one combined subscription for 1–5 shoes; 3/6/12-month terms; quoted store
-prices and 7/14/21/30-day first-term trial-credit bands; idempotent checkout;
-verified Superwall reconciliation; signed durable webhooks; scheduled coverage
-selection; purchaser-owned management; warranty replacement; coverage guards.
+## Status
 
-**Not a live payment launch:** mobile subscription screens and the native purchase
-adapter are the next phase. No prices, term discounts, store products, provider
-credentials, or external dashboards were fabricated or provisioned. Real store
-sandbox purchases and notification delivery must be checked before enabling
-purchase or enforcement flags. Server unit tests cover the enforcement switch,
-coverage gates, ownership claim/release and the store-review grant
-(`apps/server/src/modules/billing/*.test.ts`); they mock the database, so the
-real-store checks below still apply.
+Built and tested against the **fake provider**. Cashfree itself is not
+connected yet: `BILLING_PROVIDER=cashfree` fails every call with "Payments
+aren't available yet" until `providers/cashfree.provider.ts` is written.
+Purchases and enforcement stay off by default.
 
-## Data model
+## The model in one paragraph
 
-- `device_ownerships`: family ownership survives unlinking/archiving children.
-- `device_activations`: the first successful link starts exactly 30 days; relinking
-  never resets it. Account deletion leaves minimal anti-repeat activation history.
-- `billing_customers`: stable UUIDv4 identity, distinct from mutable family admins.
-  Call `/billing/manage` to get the authenticated purchaser's Superwall identity.
-- `family_subscriptions`: one live bundle per family and per purchaser. The
-  `original_transaction_id` column stores Superwall V3's stable `subscription_id`;
-  individual store transaction IDs live in the transaction ledger.
-- `billing_quotes` / `billing_checkout_intents`: immutable selected shoes, prices,
-  term, provider identity, revision and offer. Quotes expire after 15 minutes;
-  successful delayed payments are not discarded just because a quote expired.
-- `billing_transactions`: idempotent verified/unassigned/revoked store ledger.
-- `device_coverage_intervals`: historical paid/free/grace/legacy/support grants.
-- `billing_trial_credits`: consumes each physical-device trial once, only after a
-  verified qualifying offer purchase. Warranty replacements inherit conversion.
-- `billing_offer_codes`: AES-256-GCM encrypted Apple one-time codes, hashed for
-  redemption lookup. An issued code is never returned to the available pool.
-- `billing_provider_events`: verified Svix intake, retry and leased processing.
-  Completed raw payloads are deleted after 30 days; financial records are separate.
-- `billing_audit`: catalog, code import, ownership release and warranty operations.
+Prices live on our server as per-shoe prices for 3, 6 and 12 months. Each
+family has at most one live plan, paid by one person through one autopay
+mandate (UPI AutoPay, card or eNACH) with a ₹5,000 limit per debit. The server
+works out every charge (amount and IST due date) and raises it against the
+mandate a few days ahead; the provider only moves money. A paid charge grants
+per-shoe coverage intervals, which is all the rest of the app checks.
 
-User/family deletion nulls financial identity references instead of cascading the
-ledger. Child deletion does not remove device activations or paid grants. Parent
-email/name and child names must not be sent as Superwall attributes.
+## Rules
 
-## Migration and rollout
+- **Free days are kept.** A new plan starts when the first selected shoe's free
+  month ends. Shoes with free days left get them taken off the first charge
+  (`per-shoe price × days left ÷ days in the period`, whole rupees). If a shoe
+  has no free days left, coverage starts as soon as the autopay is approved and
+  the first charge is due the next day.
+- **Adding shoes** charges only for the rest of the current period, from when
+  each added shoe's own free month ends. Nothing is charged if the free month
+  outlasts the period; the shoe joins at renewal.
+- **Swapping shoes and changing the period** apply at the next renewal. They
+  rebuild a renewal charge that hasn't been sent to the bank yet, and are
+  refused while one is being debited.
+- **Anyone in the family can start a plan.** Only the person who pays can change
+  it, cancel it, pay a failed charge or see invoices (`NOT_PURCHASER`). One
+  autopay setup per family at a time (`CHECKOUT_IN_PROGRESS`); the same person
+  starting again replaces their earlier attempt.
+- **Cancelling** cancels the mandate at once; coverage runs to the end of the
+  paid period plus 3 days. Resuming needs the mandate to still be active,
+  otherwise the app sets up a new autopay (`AUTOPAY_REQUIRED`). A plan that was
+  never paid simply ends and the free months carry on.
+- **Autopay turned off in the UPI app** (or paused, or card expired) has the
+  same effect as cancelling.
+- **Failed charges**: the plan goes `past_due`. UPI retries on its own; for
+  cards and eNACH the server retries the next day, up to 3 attempts. Tracking
+  continues for 3 days after the due date, then the plan expires. "Pay now"
+  takes a one-off payment outside the autopay and stops the retries. An added
+  shoe whose charge never goes through leaves the plan.
+- **Prices include 18% GST.** Every paid charge gets an invoice numbered per
+  financial year (`SW/26-27/00042`), split into CGST and SGST.
 
-`apps/server/drizzle/0012_family_billing.sql` is additive and billing-only;
-`0013_billing_price_evidence.sql` adds verified monetary evidence to the ledger. Earlier
-hand-written migrations had no snapshots; the new snapshot reconciles that drift
-without applying their DDL again. The migration backfills first activation from
-the earliest retained binding and ownership from the latest known family binding,
-including currently unlinked shoes. Existing explicit child plans retain coverage
-intervals. Already purchased shoes cannot receive another first-trial credit.
-It does not grant a new migration-day trial or indefinite paid service.
+## Data model (`src/db/schema/billing.ts`)
 
-Run the ordinary dev migration command:
+| Table | Holds |
+|---|---|
+| `device_activations`, `device_ownerships` | Unchanged: the free month per physical shoe and family ownership. `trial_converted_at` is set when a plan takes over a shoe, so its free days can't be credited twice. |
+| `billing_price_book` | Versioned per-shoe prices. Plans keep the version they were sold at. Launch prices are seeded by migration 0020. |
+| `billing_customers` | The paying person. |
+| `billing_quotes` | Everything a quote promised (shoes, dates, amounts, credits, schedule). Expires after 15 minutes. |
+| `billing_mandates` | One autopay at the payer's bank. Our id is the reference the provider gets. |
+| `billing_checkout_intents` | One autopay setup (new plan, or replacing a plan's autopay) and the session the app opens. |
+| `family_subscriptions` | The plan: shoes, period, price, mandate, state (`scheduled`, `active`, `past_due`, `cancelled`, `expired`, `revoked`), scheduled changes and `revision`. |
+| `billing_charges` | Every debit (`first`, `renewal`, `add_shoes`, `one_time`) with its breakdown and the coverage it buys. One row is one payment at the provider. |
+| `billing_refunds`, `billing_invoices`, `billing_invoice_sequences` | Support refunds and GST invoices. |
+| `device_coverage_intervals` | Coverage per shoe: `trial`, `paid`, `grace`, `provisional` (before the first debit clears), `support`. |
+| `billing_provider_events` | Verified webhooks, queued for the worker. |
+| `billing_fake_objects` | State for the fake provider only. |
+| `billing_audit` | Every change, with who made it. |
 
-```sh
-pnpm --filter @stepwhere/server db:migrate
-```
+Migration 0019 drops the old store tables (they never held payments); 0020
+creates the new ones and adds the `billing` notification type.
 
-For local Postgres use `db:migrate:local`, or set `DATABASE_URL` and `DIRECT_URL`
-explicitly and run `drizzle-kit migrate --config drizzle.config.ts` from the server.
-For prod use the same checked-in migration with the prod Infisical environment;
-do not use `db:push` or reset a populated database.
+## Code (`src/modules/billing/`)
 
-Keep these default flags off:
+| File | Does |
+|---|---|
+| `billing-pricing.ts` | Pure maths: quotes, credits, pro-rating, IST dates, GST split, invoice numbers. Unit-tested. |
+| `billing.service.ts` | Prices, quotes, overview and DTOs, purchaser checks. |
+| `billing-checkout.service.ts` | Starting and polling an autopay setup. |
+| `billing-subscription.service.ts` | Add shoes, schedule renewal changes, cancel, resume, pay now, invoices. |
+| `billing-ledger.service.ts` | Applies what the provider reports to mandates, plans, charges, coverage and invoices. Idempotent. |
+| `billing.worker.ts` | Webhook queue, renewal charges, submitting and retrying charges, reconciling, expiry, share-link revocation. |
+| `billing-notifications.service.ts` | Push reminders and receipts. |
+| `billing-admin.service.ts` / `.routes.ts` | Prices, refunds, support coverage, family detail, warranty and ownership tools. |
+| `providers/` | The provider interface, the fake provider and the Cashfree stub. |
 
-```dotenv
-BILLING_PURCHASES_ENABLED=false
-BILLING_EARLY_CREDIT_ENABLED=false
-BILLING_ENFORCEMENT_ENABLED=false
-BILLING_PILOT_ORGANIZATION_IDS=
-BILLING_STORE_ENVIRONMENT=SANDBOX
-```
+## API
 
-Device ownership has its own switch, on by default:
+Family routes (`/v1`, any family member):
 
-```dotenv
-BILLING_DEVICE_OWNERSHIP_ENABLED=true
-```
+| Route | Purpose |
+|---|---|
+| `GET /billing/overview` | Prices, shoes, plan and any setup in progress. The app's main read. |
+| `GET /billing/prices`, `/billing/devices`, `/billing/subscription` | The same pieces separately. |
+| `POST /billing/quotes` | `new_plan` or `add_shoes` → dated list of charges. |
+| `POST /billing/checkout`, `GET /billing/checkout/{id}` | Start and poll an autopay setup. Polling re-checks the provider. |
+| `POST /billing/subscription/add-shoes` | Apply an `add_shoes` quote. Payer only. |
+| `PUT /billing/subscription/renewal` | Shoes or period for the next period. Payer only. |
+| `POST /billing/subscription/cancel`, `/resume`, `/autopay` | Cancel, undo, or set up a new autopay. Payer only. |
+| `POST /billing/charges/{id}/pay-now`, `GET /billing/charges` | One-off payment for a failed charge; payments and invoices. Payer only. |
+| `POST /billing/dev/fake/{kind}/{id}` | Fake provider only, never in production: approve, decline, pay or fail anything. |
 
-`BILLING_DEVICE_OWNERSHIP_ENABLED` is independent of enforcement. When `true`
-(today's behaviour), every bind path (onboarding create/bind, admin bind, admin
-"create child for user", store-review provisioning) claims the shoe for the
-family through `claimDevice`, and reserving or binding a shoe another family owns
-returns 409 `DEVICE_BOUND_ELSEWHERE`. Unbinding or archiving never releases a
-claim; support releases it from the admin device page ("Release ownership",
-`POST /admin/billing/ownership-release`), which is refused while the shoe is
-still bound to a child. When `false`, no claim is recorded and the
-another-family 409 is never raised; the ordinary active-binding checks (one
-child per shoe at a time) still apply, and the 30-day physical-device trial is
-still started on first activation. Ownership drives `GET /billing/devices`,
-quotes and warranty replacement, so keep it on whenever purchases are enabled.
+Webhooks: `POST /v1/webhooks/billing/cashfree`, only when
+`BILLING_PROVIDER=cashfree`. The body is verified and stored; the worker re-reads
+each object from Cashfree before acting.
 
-`BILLING_PILOT_ORGANIZATION_IDS` enables enforcement for only the listed families.
-Do not enable global enforcement until the existing-device rollout policy is
-chosen: old test shoes can already have expired trials. A provider outage does not
-extend grants; disabling enforcement restores existing app service behavior.
+Admin (`/v1/admin`): `POST /admin/billing/prices`,
+`POST /admin/billing/charges/{id}/refund`, `POST /admin/billing/coverage-grants`,
+`GET /admin/billing/families/{organizationId}`, `GET /admin/billing/review-queue`,
+`POST /admin/billing/events/{id}/retry`, plus the warranty and ownership tools.
 
-## External setup
+## Background jobs (`src/index.ts`)
 
-1. Apple: one `StepWhere Family Service` subscription group, 15 products
-   `com.stepwhere.family.{1..5}.{3|6|12}m`. Higher shoe counts rank above lower
-   counts; all durations for a count use the same level. Disable Family Sharing.
-   Configure three-day billing grace and approved subscription metadata.
-2. Play: five products `stepwhere_family_{1..5}`, each with auto-renewing
-   `p3m`, `p6m`, `p12m` base plans and three-day grace. No monthly base plan.
-3. Superwall: connect both stores under the project's `com.stepwhere` apps;
-   configure count entitlements `family_1_shoe` through `family_5_shoes`.
-4. Store first-term offers: one full term discounted, then normal renewal. Four
-   trial-credit bands per product/base plan. Apple uses individual offer codes;
-   Google uses developer-determined offers, explicitly selected by the adapter.
-   Longer-term discounts belong in the normal store renewal price, not arbitrary
-   client-side payment amounts.
-5. Put server-only values in Infisical: `SUPERWALL_API_KEY` (organization key with
-   `customers:read` and `users:read`), `SUPERWALL_PROJECT_ID`, comma-separated
-   `SUPERWALL_APPLICATION_IDS`, `SUPERWALL_WEBHOOK_SECRET`, and
-   `BILLING_OFFER_CODE_KEY` (32 random bytes as 64 hex characters). Back up the
-   encryption key; rotation requires re-encrypting code inventory.
-6. Set Superwall webhook URL to `https://YOUR_API/v1/webhooks/superwall`. Copy that
-   endpoint's Svix signing secret. Configure the appropriate store server
-   notification integrations in Superwall. Separate sandbox/prod deployments;
-   events and queried grants must match the configured store environment.
+| Job | Every | Does |
+|---|---|---|
+| `billing-events` | 30 s | Applies queued webhook events. |
+| `billing-coverage` | 30 s | Expires plans past grace, drops unpaid added shoes, revokes share links. |
+| `billing-charges` | 1 min | Builds renewals 5 days ahead, sends charges 3 days ahead, retries, reconciles. |
+| `billing-mandates` | 10 min | Expires abandoned setups and re-reads autopays daily. |
+| `billing-reminders` | 1 h | Charge-tomorrow notices and free-month reminders. |
 
-The server reads Superwall's documented
-[subscriber API and V3 subscription history](https://api.superwall.com/docs),
-requiring matching customer identity and purchased ownership. Alias conflicts
-are held for review instead of assigning the current screen's children.
-[Webhook signatures](https://superwall.com/docs/integrations/webhooks/verify) are
-verified against the unmodified raw body before durable intake. Refund hints
-revoke the affected transaction even if it is no longer the current period.
+## Settings
 
-## Catalog configuration
+| Variable | Default | Notes |
+|---|---|---|
+| `BILLING_PURCHASES_ENABLED` | `false` | Turns on quotes and checkout. |
+| `BILLING_ENFORCEMENT_ENABLED` / `BILLING_PILOT_ORGANIZATION_IDS` | `false` / empty | Locks shoes without coverage, for everyone or for pilot families. |
+| `BILLING_PROVIDER` | `fake` | `cashfree` once connected. A production server refuses to sell through `fake`. |
+| `BILLING_ENVIRONMENT` | `SANDBOX` | `PRODUCTION` needs `cashfree`. |
+| `BILLING_MANDATE_MAX_MINOR` | `500000` | ₹5,000 autopay limit. |
+| `BILLING_LEGAL_NAME`, `BILLING_GSTIN` | – | For invoices. |
+| `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET`, `CASHFREE_WEBHOOK_SECRET`, `CASHFREE_API_VERSION` | – / `2026-01-01` | Required once purchases run on Cashfree. |
 
-Use the existing system-admin token with `POST /v1/admin/billing/catalog`.
-One row describes one store/environment/count/term/currency/storefront/credit-band
-variant. Supply actual configured store minor-unit prices; no placeholder seed
-prices exist. Normal rows use band `0`, `offerId: null`, and identical purchase
-and renewal prices. Google rows include the corresponding `basePlanId`.
+## Tests
 
-Example shape (replace every price and identifier with reviewed store settings):
+- `billing-pricing.test.ts`: the maths, including the mockups' numbers.
+- `billing.flow.integration.test.ts`: every flow end to end against Postgres and
+  the fake provider. Run it on a throwaway database:
 
-```json
-{
-  "store": "APP_STORE",
-  "environment": "SANDBOX",
-  "shoeCount": 2,
-  "termMonths": 6,
-  "productId": "com.stepwhere.family.2.6m",
-  "basePlanId": null,
-  "offerId": null,
-  "currency": "INR",
-  "storefront": "IN",
-  "trialCreditBand": 0,
-  "amountMinor": 100000,
-  "renewalAmountMinor": 100000,
-  "enabled": false
-}
-```
+  ```sh
+  BILLING_IT=1 BILLING_PURCHASES_ENABLED=true DATABASE_URL=postgresql://… \
+    pnpm --filter @stepwhere/server exec vitest run billing.flow
+  ```
 
-The example amounts are illustrative, not pricing recommendations. Only enable
-rows after matching store configuration. Use the same two-/three-letter
-storefront value when requesting quotes. For a discounted row, `offerId` is the
-configured Google offer identifier or Apple offer reference. Import Apple codes
-with `POST /admin/billing/offer-codes`:
-`{catalogId, expiresAt, codes:[...]}`; codes are never echoed or audited in cleartext.
+## Not done yet
 
-Credit calculation uses remaining free days divided by **all selected shoes**,
-rounding up to 7/14/21/30. Already converted/paid shoes contribute zero. The
-configured store offer price must be at most
-`renewalAmountMinor * (1 - band/(30*termMonths))`. Missing codes, offers or eligible
-prices return `EARLY_CHECKOUT_UNAVAILABLE`, preserving free service.
-
-## API and native handoff
-
-All paths below are under `/v1`; normal `{data: ...}` responses and bearer auth.
-
-| Endpoint | Authority / behavior |
-| --- | --- |
-| `GET /billing/devices` | Family members; owned shoes, nullable child, trial and coverage state |
-| `GET /billing/subscription` | Members; selected shoes, dates, renewal, purchaser flag, revision |
-| `GET /billing/manage` | Authenticated purchaser, even after demotion; identity and original-store management URLs |
-| `POST /billing/quotes` | Family admin; `{deviceIds,termMonths,store,currency,storefront}` |
-| `POST /billing/checkout-intents` | Admin and original purchaser for changes; `{quoteId,idempotencyKey}` |
-| `GET /billing/checkout-intents/{id}` | Members; status, no private offer code or store transaction token |
-| `POST /billing/sync` | Purchaser; authoritative query, not a trusted client receipt/boolean |
-| `PATCH /billing/coverage-selection` | Admin and original purchaser; `{deviceIds,revision}`; same count, next renewal |
-| `POST /webhooks/superwall` | Svix-authenticated public route, durable intake before acknowledgement |
-| `POST /admin/billing/warranty-replacements` | System admin; `{organizationId,oldDeviceId,newDeviceId,reason}` |
-| `POST /admin/billing/ownership-release` | System admin; `{deviceId,reason}` (reason ≥ 10 chars); 409 while still bound to a child or covered/scheduled; admin UI: device page "Release ownership" |
-| `GET /admin/billing/review-queue` | System admin; sanitized unresolved events/intents/transactions |
-| `POST /admin/billing/events/{id}/retry` | System admin; retry after resolving configuration/identity issue |
-| `POST /admin/billing/checkout-intents/{id}/abandon` | System admin; `{reason}`; re-verifies before clearing unpaid checkout; issued codes never reused |
-
-For the next mobile phase:
-
-1. Identify Superwall with the stable billing customer UUID **before** purchase;
-   never use a child ID or switch to the current admin's identity on a role change.
-2. Default-select linked owned shoes, maximum five. Request a fresh quote and
-   create an intent before invoking the store. Display actual localized StoreKit/
-   Play prices; if they disagree with the quote, stop and refresh/configure catalog.
-3. Use Superwall paywalls with one purchase owner/custom controller. If native
-   offer-code, base-plan or replacement control needs `react-native-iap`, that
-   adapter alone owns purchase finishing; do not run competing purchase handlers.
-4. Count increases take effect after verified payment. Android upgrades use the
-   reviewed immediate replacement mode (`CHARGE_FULL_PRICE`); reductions/term
-   changes use `DEFERRED`. Dates and paid proration are store-authoritative.
-5. Offer redemption must match the server-issued intent/code/offer. Early payment
-   waits for signed offer evidence before consuming trial credit. Pending and
-   unassigned purchases do not grant paid access.
-6. Finish/acknowledge verified native purchases, restore on launch, then call sync
-   and poll intent status. A custom Play adapter needs explicit acknowledgement
-   and recovery; this backend does not accept/store Google purchase tokens yet.
-7. Offer restore and original-store management actions, handle cancellation without
-   signing users out, and render `SUBSCRIPTION_REQUIRED` as an access state, not 401.
-
-## Enforcement and operational checks
-
-Tracking summaries mask uncovered snapshots. Steps are hidden only for a child
-that is not covered now (the same check as the live/share gates): a covered child
-gets the same step totals, firmware counters, `activity.stepped` realtime events
-and trail cache as with enforcement off. Because cumulative totals are shown as
-soon as a child is covered, today's total on the day coverage starts can include
-samples from before the grant. For an uncovered child, Activity reads only
-covered minute buckets from past grants, never cumulative totals, live totals or
-daily fallback; a boundary minute is excluded unless fully covered. Daily fallback
-totals for covered children are shown only for fully covered local days. Historical event/path reads require
-continuous covered intervals; events spanning an unpaid gap are excluded rather
-than leaking the gap. Trails use the current continuous coverage window and reuse
-the road cache only when every cached point falls inside that window. Public shares are guarded and revoked by the
-boundary worker. Geofence evaluation and queued push delivery recheck coverage.
-Authenticated raw telemetry still ingests for recovery and support diagnostics.
-
-The store-review provisioning script (`review:provision`) claims the demo shoe
-for the reviewer family through `claimDevice` and upserts one `support` coverage
-grant (`grant_key = support:play-review`) from 8 days before the run to 10 years
-after, so the seeded 7-day history stays visible under enforcement. Re-running
-it updates that grant in place. The "Included Shoe Service" plan it writes is
-only a display label and grants no coverage.
-
-Free/ordinary paid expiration gets three days; payment failure uses only
-store-confirmed grace capped at three days. Cancellation keeps purchased dates;
-refund/revocation removes its grant immediately. Renewal reconciles scheduled shoe
-selection; support replacement transfers original trial/paid dates and disables
-the old shoe, never restarting a free month.
-
-Before enabling purchases, manually exercise both real stores: purchase, native
-acknowledgement, accelerated sandbox renewal, cancellation, billing issue/grace,
-refund, restore, delayed webhook, duplicate webhook, upgrade/downgrade, app account
-switch, admin transfer, and warranty replacement. Review unexpected payments in
-the admin queue; do not attach them to arbitrary children. Reconcile pending store
-charges before support clears a checkout. Validate history/activity at coverage
-boundaries and avoid global enforcement until native subscription UX is ready.
+- The Cashfree provider, its webhook signature check and the app's Cashfree SDK
+  (phase 6 of the plan).
+- Invoice PDFs (`pdfUrl` is always null; invoices are listed in the app).
+- Admin console screens for the admin endpoints.

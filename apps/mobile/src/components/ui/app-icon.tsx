@@ -13,6 +13,9 @@ export type AppIconName =
   | "account-plus"
   | "account-switch"
   | "activity"
+  | "alert"
+  | "autopay"
+  | "bank"
   | "arrow-left"
   | "battery"
   | "battery-empty"
@@ -30,6 +33,10 @@ export type AppIconName =
   | "chat"
   | "clock"
   | "copy"
+  | "credit-card"
+  | "crown"
+  | "document"
+  | "download"
   | "chevron-down"
   | "chevron-left"
   | "chevron-right"
@@ -47,16 +54,20 @@ export type AppIconName =
   | "info"
   | "keypad"
   | "layers"
+  | "lock"
   | "logs"
   | "logout"
+  | "pause"
   | "pencil"
   | "navigation"
   | "plus"
   | "profile"
   | "qrcode"
+  | "refresh"
   | "scan"
   | "save"
   | "share"
+  | "send"
   | "shoe"
   | "shield"
   | "shield-half"
@@ -77,6 +88,8 @@ export type AppIconName =
   | "children"
   | "shield-alt"
   | "sun"
+  | "swap"
+  | "wifi-off"
   | "moon";
 
 const materialIconMap: Record<
@@ -86,6 +99,9 @@ const materialIconMap: Record<
   "account-plus": "account-plus-outline",
   "account-switch": "account-switch-outline",
   activity: "chart-bar",
+  alert: "alert-circle-outline",
+  autopay: "contactless-payment",
+  bank: "bank-outline",
   "arrow-left": "arrow-left",
   battery: "battery-high",
   "battery-empty": "battery-10",
@@ -103,6 +119,10 @@ const materialIconMap: Record<
   chat: "message-outline",
   clock: "clock-outline",
   copy: "content-copy",
+  "credit-card": "credit-card-outline",
+  crown: "crown-outline",
+  document: "file-document-outline",
+  download: "download",
   "chevron-down": "chevron-down",
   "chevron-left": "chevron-left",
   "chevron-right": "chevron-right",
@@ -120,16 +140,20 @@ const materialIconMap: Record<
   info: "information-outline",
   keypad: "dialpad",
   layers: "layers-outline",
+  lock: "lock-outline",
   logs: "clipboard-text-outline",
   logout: "logout",
+  pause: "pause-circle-outline",
   pencil: "pencil-outline",
   navigation: "navigation-variant",
   plus: "plus",
   profile: "account-circle-outline",
   qrcode: "qrcode-scan",
+  refresh: "refresh",
   scan: "line-scan",
   save: "content-save",
   share: "share-variant-outline",
+  send: "send-outline",
   shoe: "shoe-sneaker",
   shield: "shield-check-outline",
   "shield-half": "shield-half-full",
@@ -144,10 +168,12 @@ const materialIconMap: Record<
   "signal-three": "signal-cellular-3",
   "signal-two": "signal-cellular-2",
   sun: "weather-sunny",
+  swap: "swap-horizontal",
   target: "crosshairs-gps",
   trash: "trash-can-outline",
   user: "account-outline",
   walk: "walk",
+  "wifi-off": "wifi-off",
   moon: "weather-night",
 };
 

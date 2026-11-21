@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   type QueryClient,
   useInfiniteQuery,
   useMutation,
@@ -8,21 +9,32 @@ import {
 
 import type {
   ActivityPeriod,
+  BillingOverviewDto,
+  BillingTermMonths,
+  CreateBillingQuoteInput,
   ChildTrailGeometryRequestMode,
   BindChildDeviceInput,
   UpdateChildInput,
   UpdateMeInput,
 } from '@stepwhere/types';
 
+import { isBillingConflictError } from '@/features/billing/billing-errors';
 import {
+  addBillingShoes,
+  ApiError,
   archiveChild,
   bindChildDevice,
+  cancelBillingSubscription,
+  createBillingQuote,
   createFamilyQrInvite,
   getChildActivity,
   getChildHistoryDay,
   getChildHistoryRange,
   getChild,
   getActiveChildShareLink,
+  getBillingCharges,
+  getBillingCheckout,
+  getBillingOverview,
   getChildTrail,
   getFamilyMembers,
   getMe,
@@ -32,7 +44,12 @@ import {
   getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
+  payBillingChargeNow,
   removeFamilyMember,
+  resumeBillingSubscription,
+  scheduleBillingRenewal,
+  startBillingAutopayReplacement,
+  startBillingCheckout,
   unlinkChildDevice,
   updateChild,
   updateMe,
@@ -436,5 +453,234 @@ export function useMarkAllNotificationsReadMutation() {
         }
       }
     },
+  });
+}
+
+// Billing ---------------------------------------------------------------
+
+const BILLING_CHECKOUT_POLL_MS = 2_000;
+const BILLING_BANK_PENDING_POLL_MS = 15_000;
+const BILLING_QUOTE_GC_MS = 15 * 60_000;
+
+/** 4xx answers (BILLING_DISABLED, NOT_PURCHASER, …) won't change on retry. */
+function shouldRetryBilling(failureCount: number, error: unknown) {
+  if (error instanceof ApiError && (error.status < 500 || error.code === 'BILLING_DISABLED')) {
+    return false;
+  }
+
+  return failureCount < 1;
+}
+
+/**
+ * Refreshes everything a billing change can affect: the billing overview and
+ * charges, and the family overview, trail and history that drive the locks.
+ * Quotes are left alone; they are re-quoted explicitly.
+ */
+export function invalidateBillingDependents(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({
+    predicate: query => query.queryKey[0] === 'billing' && query.queryKey[1] !== 'quote',
+  });
+  void queryClient.invalidateQueries({ queryKey: ['overview'] });
+  void queryClient.invalidateQueries({ queryKey: ['child-trail'] });
+  void queryClient.invalidateQueries({ queryKey: ['child-history'] });
+  void queryClient.invalidateQueries({ queryKey: ['child-activity'] });
+}
+
+export function useBillingOverviewQuery(
+  organizationId: string | null | undefined,
+  options?: { refetchInterval?: number | false },
+) {
+  return useQuery({
+    queryKey: queryKeys.billingOverview(organizationId),
+    queryFn: ({ signal }) => getBillingOverview({ operationName: 'getBillingOverview', signal }),
+    enabled: Boolean(organizationId),
+    refetchInterval: options?.refetchInterval,
+    retry: shouldRetryBilling,
+  });
+}
+
+export function useBillingChargesQuery(organizationId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.billingCharges(organizationId),
+    queryFn: ({ signal }) => getBillingCharges({ operationName: 'getBillingCharges', signal }),
+    enabled: Boolean(organizationId) && enabled,
+    retry: shouldRetryBilling,
+  });
+}
+
+/**
+ * Quotes are POSTs but behave like reads: the same shoes and term give the
+ * same quote until it expires, so Choose a plan and Review plan share one
+ * cache entry. Screens re-quote with `refetch()` when `expiresAt` passes.
+ */
+export function useBillingQuoteQuery(
+  organizationId: string | null | undefined,
+  input: CreateBillingQuoteInput | null,
+) {
+  const termMonths: BillingTermMonths | null = input?.kind === 'new_plan' ? input.termMonths : null;
+
+  return useQuery({
+    queryKey: input
+      ? queryKeys.billingQuote(organizationId, input.kind, input.deviceIds, termMonths)
+      : ['billing', 'quote', 'disabled'] as const,
+    queryFn: ({ signal }) => {
+      if (!input) {
+        throw new Error('Billing quote requested without input.');
+      }
+
+      return createBillingQuote(input, { operationName: 'createBillingQuote', signal });
+    },
+    enabled: Boolean(organizationId && input && input.deviceIds.length > 0),
+    staleTime: Infinity,
+    gcTime: BILLING_QUOTE_GC_MS,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: keepPreviousData,
+    retry: shouldRetryBilling,
+  });
+}
+
+/** Polls while the autopay is waiting to be approved; the server re-checks the provider. */
+export function useBillingCheckoutQuery(checkoutId: string | null) {
+  return useQuery({
+    queryKey: checkoutId ? queryKeys.billingCheckout(checkoutId) : ['billing', 'checkout', 'disabled'] as const,
+    queryFn: ({ signal }) => {
+      if (!checkoutId) {
+        throw new Error('Billing checkout requested without an id.');
+      }
+
+      return getBillingCheckout(checkoutId, { operationName: 'getBillingCheckout', signal });
+    },
+    enabled: Boolean(checkoutId),
+    refetchInterval: (query) => {
+      const state = query.state.data?.state;
+
+      if (!state || state === 'awaiting_authorization') {
+        return BILLING_CHECKOUT_POLL_MS;
+      }
+
+      return state === 'bank_pending' ? BILLING_BANK_PENDING_POLL_MS : false;
+    },
+    retry: shouldRetryBilling,
+  });
+}
+
+export function useStartBillingCheckoutMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { quoteId: string; idempotencyKey: string }) => startBillingCheckout(input, {
+      operationName: 'startBillingCheckout',
+    }),
+    onSuccess: (checkout) => {
+      queryClient.setQueryData(queryKeys.billingCheckout(checkout.id), checkout);
+      invalidateBillingDependents(queryClient);
+    },
+  });
+}
+
+export function useStartBillingAutopayMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { idempotencyKey: string }) => startBillingAutopayReplacement(input, {
+      operationName: 'startBillingAutopayReplacement',
+    }),
+    onSuccess: (checkout) => {
+      queryClient.setQueryData(queryKeys.billingCheckout(checkout.id), checkout);
+      invalidateBillingDependents(queryClient);
+    },
+  });
+}
+
+export function useAddBillingShoesMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { quoteId: string; idempotencyKey: string }) => addBillingShoes(input, {
+      operationName: 'addBillingShoes',
+    }),
+    onSuccess: () => invalidateBillingDependents(queryClient),
+  });
+}
+
+export function usePayBillingChargeNowMutation() {
+  return useMutation({
+    mutationFn: (chargeId: string) => payBillingChargeNow(chargeId, { operationName: 'payBillingChargeNow' }),
+  });
+}
+
+/**
+ * Sends the plan's current `revision`. On a revision conflict it refetches the
+ * overview and retries once with the new revision.
+ */
+async function runWithBillingRevision<T>(
+  queryClient: QueryClient,
+  organizationId: string | null | undefined,
+  run: (revision: number) => Promise<T>,
+) {
+  const queryKey = queryKeys.billingOverview(organizationId);
+  const fetchFresh = () => queryClient.fetchQuery({
+    queryKey,
+    queryFn: ({ signal }) => getBillingOverview({ operationName: 'getBillingOverview', signal }),
+    staleTime: 0,
+  });
+  const cached = queryClient.getQueryData<BillingOverviewDto>(queryKey);
+  const subscription = cached?.subscription ?? (await fetchFresh()).subscription;
+
+  if (!subscription) {
+    throw new Error('There is no plan to change.');
+  }
+
+  try {
+    return await run(subscription.revision);
+  } catch (error) {
+    if (!isBillingConflictError(error)) {
+      throw error;
+    }
+
+    const fresh = await fetchFresh();
+
+    if (!fresh.subscription) {
+      throw error;
+    }
+
+    return run(fresh.subscription.revision);
+  }
+}
+
+export function useScheduleBillingRenewalMutation(organizationId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { nextDeviceIds: string[] | null; nextTermMonths: BillingTermMonths | null }) => (
+      runWithBillingRevision(queryClient, organizationId, revision => scheduleBillingRenewal({
+        revision,
+        ...input,
+      }, { operationName: 'scheduleBillingRenewal' }))
+    ),
+    onSuccess: () => invalidateBillingDependents(queryClient),
+  });
+}
+
+export function useCancelBillingSubscriptionMutation(organizationId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => runWithBillingRevision(queryClient, organizationId, revision => (
+      cancelBillingSubscription({ revision }, { operationName: 'cancelBillingSubscription' })
+    )),
+    onSuccess: () => invalidateBillingDependents(queryClient),
+  });
+}
+
+export function useResumeBillingSubscriptionMutation(organizationId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => runWithBillingRevision(queryClient, organizationId, revision => (
+      resumeBillingSubscription({ revision }, { operationName: 'resumeBillingSubscription' })
+    )),
+    onSuccess: () => invalidateBillingDependents(queryClient),
   });
 }

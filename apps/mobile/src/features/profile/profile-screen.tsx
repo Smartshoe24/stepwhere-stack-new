@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { BlurTargetView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,9 +13,11 @@ import { useNativeTabVisibility } from '@/components/navigation/native-tab-visib
 import { getRuntimeThemeName } from '@/components/theme/switch-runtime-theme';
 import { useThemeTransition } from '@/components/theme/use-theme-transition';
 import { useAuth } from '@/features/auth/use-auth';
+import { SubscriptionCard } from '@/features/billing/subscription-card';
 import { toOverviewChildCard } from '@/features/overview/overview-ui';
 import { ApiError } from '@/lib/api-client';
 import { useFamilyMembersQuery, useLeaveFamilyMutation, useOverviewQuery } from '@/query/hooks';
+import { queryKeys } from '@/query/query-keys';
 
 import { CustomerSupportCard } from './customer-support-card';
 import { FamilyInviteQrSheet } from './family-invite-qr-sheet';
@@ -37,6 +40,7 @@ const NOTICE_TIMEOUT_MS = 2500;
 export function ProfileScreen() {
   const auth = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { rt, theme } = useUnistyles();
   const { isTransitioning, runThemeTransition, transitionTargetTheme } = useThemeTransition();
@@ -213,7 +217,11 @@ export function ProfileScreen() {
   }
 
   function handleRefresh() {
-    void Promise.all([overviewQuery.refetch(), familyMembersQuery.refetch()]);
+    void Promise.all([
+      overviewQuery.refetch(),
+      familyMembersQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.billingOverview(familyOrganizationId) }),
+    ]);
   }
 
   function handleTopBarLayout(event: LayoutChangeEvent) {
@@ -274,6 +282,8 @@ export function ProfileScreen() {
               phoneNumber={phoneNumber}
               protectingSince={protectingSince}
             />
+
+            <SubscriptionCard />
 
             {errorMessage ? (
               <ProfileErrorState message={errorMessage} onRetry={handleRefresh} />
