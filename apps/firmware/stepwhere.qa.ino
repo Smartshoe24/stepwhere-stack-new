@@ -47,7 +47,7 @@
 #include "src/pedometer.h"
 #include "src/radio_parsers.h"
 
-#define QA_FW_VERSION "qa-0.7.3"
+#define QA_FW_VERSION "qa-0.7.4"
 
 // ─── Limits ───────────────────────────────────────────────────────────────────
 // The firmware decides pass or fail and reports the limit it used.
@@ -102,6 +102,13 @@ constexpr uint8_t NETLOC_UPLOADS = 10;
 constexpr uint32_t NETLOC_INTERVAL_MS = 30000;
 constexpr uint8_t NETLOC_MIN_ACCEPTED = 8;
 constexpr uint8_t NETLOC_MAX_APS = 8;       // keeps the upload well under 2 KB
+// qa-0.7.4: every upload also carries the status of each test so far, and one
+// more upload after the last test carries the final results and the error texts.
+// So a board tested without TTL still gets its Board tests in admin.
+constexpr size_t NETLOC_PAYLOAD_SIZE = 2048;  // production firmware sends up to 2560 bytes
+constexpr size_t RESULT_ERROR_CHARS = 60;     // error text kept per test for the last upload
+constexpr uint8_t SUMMARY_ATTEMPTS = 3;
+constexpr uint32_t SUMMARY_RETRY_MS = 5000;
 #ifndef QA_INGEST_URL
 #define QA_INGEST_URL "http://ingest.stepwhere.in/location"
 #endif
@@ -274,6 +281,10 @@ struct AxesMg {
 };
 
 char chipUid[25] = "";
+// Random per boot: the server tells this boot's run apart from earlier ones (8 hex characters).
+char bootSession[9] = "";
+// The error or skip reason of each test in the current run, shortened, for the last upload.
+char testError[TEST_COUNT][RESULT_ERROR_CHARS + 1] = {};
 volatile uint32_t stepInterrupts = 0;
 
 enum class AccelChip : uint8_t { None, Lis2ds12, Lis2dh12 };
@@ -366,6 +377,37 @@ QaLine run_line(const char *event) {
   return line;
 }
 
+/**
+ * A per-boot ID for the uploads. The G0 has no random number generator, so it
+ * mixes a boot counter kept in TAMP BKP1R (survives resets), the timer and the
+ * noise in the low bits of internal ADC readings. Only needs to differ between
+ * boots of the same board.
+ */
+void make_boot_session() {
+  const uint32_t boots = TAMP->BKP1R + 1;
+  TAMP->BKP1R = boots;
+  uint32_t hash = 2166136261UL;  // FNV-1a
+  auto mix = [&hash](uint32_t value) {
+    for (uint8_t i = 0; i < 4; i++) {
+      hash ^= (value >> (8 * i)) & 0xFF;
+      hash *= 16777619UL;
+    }
+  };
+  mix(boots);
+  mix(HAL_GetUIDw0() ^ HAL_GetUIDw1() ^ HAL_GetUIDw2());
+  for (uint8_t i = 0; i < 32; i++) {
+#ifdef ATEMP
+    mix((uint32_t)analogRead(ATEMP));
+#endif
+#ifdef AVREF
+    mix((uint32_t)analogRead(AVREF));
+#endif
+    mix(SysTick->VAL);
+  }
+  mix(micros());
+  snprintf(bootSession, sizeof(bootSession), "%08lX", (unsigned long)hash);
+}
+
 void read_chip_uid() {
   snprintf(chipUid, sizeof(chipUid), "%08lX%08lX%08lX",
            (unsigned long)HAL_GetUIDw0(), (unsigned long)HAL_GetUIDw1(),
@@ -408,9 +450,20 @@ void print_result_human(TestId id, Outcome outcome, uint32_t ms, const char *err
 }
 
 /** Starts a result line; the caller adds data fields and calls end(). */
+/** Keeps a JSON-safe, shortened copy of a test's error for the last upload. */
+void remember_error(TestId id, const char *error) {
+  size_t length = 0;
+  for (const char *c = error; c && *c && length < RESULT_ERROR_CHARS; c++) {
+    const char ch = *c;
+    testError[id][length++] = (ch == '"' || ch == '\\' || (uint8_t)ch < 0x20 || (uint8_t)ch > 0x7E) ? ' ' : ch;
+  }
+  testError[id][length] = '\0';
+}
+
 QaLine result_line(TestId id, Outcome outcome, uint32_t ms, const char *error = nullptr) {
   TAMP->BKP0R = 0;
   run.outcome[id] = outcome;
+  remember_error(id, error);
   print_result_human(id, outcome, ms, error);
   QaLine line = run_line("test");
   line.str("id", TEST_NAMES[id])
@@ -1803,8 +1856,10 @@ bool append(char *buffer, size_t size, size_t &used, const char *format, ...) {
  * One upload in the shape the server takes from the production firmware, plus
  * the "qa" block (chip UID and QA firmware version) that marks it as a QA run.
  */
+void append_results(char *out, size_t size, size_t &used, bool done, bool withErrors);
+
 bool build_netloc_payload(char *out, size_t size, const ServingCell &cell, const stepwhere::WifiScanResult &wifi,
-                          uint8_t &wifiSent) {
+                          uint8_t &wifiSent, bool done = false, bool withErrors = false) {
   size_t used = 0;
   const uint32_t satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
   const bool fix = gps.location.isValid() && gps.location.age() < 2000 && satellites >= GPS_MIN_SATELLITES;
@@ -1846,8 +1901,80 @@ bool build_netloc_payload(char *out, size_t size, const ServingCell &cell, const
     }
     append(out, size, used, "]}");
   }
-  append(out, size, used, ",\"qa\":{\"uid\":\"%s\",\"fw\":\"" QA_FW_VERSION "\"}}", chipUid);
+  append(out, size, used, ",\"qa\":{\"uid\":\"%s\",\"fw\":\"" QA_FW_VERSION "\",\"s\":\"%s\",\"run\":%lu",
+         chipUid, bootSession, (unsigned long)run.number);
+  append_results(out, size, used, done, withErrors);
+  append(out, size, used, "}}");
   return used < size;
+}
+
+const char *upload_status(TestId id, bool done) {
+  switch (run.outcome[id]) {
+    case Outcome::Pass: return "pass";
+    case Outcome::Fail: return "fail";
+    case Outcome::Skip: return "skip";
+    default: return (id == T_NETLOC && !done) ? "running" : "pending";
+  }
+}
+
+/** `"results":{"power":"pass",…}` for the tests of this run, then the errors and `"done":true` on the last upload. */
+void append_results(char *out, size_t size, size_t &used, bool done, bool withErrors) {
+  append(out, size, used, ",\"results\":{");
+  bool first = true;
+  for (uint8_t i = 0; i < TEST_COUNT; i++) {
+    if (!selected((TestId)i)) continue;
+    append(out, size, used, "%s\"%s\":\"%s\"", first ? "" : ",", TEST_NAMES[i], upload_status((TestId)i, done));
+    first = false;
+  }
+  append(out, size, used, "}");
+  if (withErrors) {
+    append(out, size, used, ",\"errors\":{");
+    first = true;
+    for (uint8_t i = 0; i < TEST_COUNT; i++) {
+      const bool hasError = selected((TestId)i) && testError[i][0]
+          && (run.outcome[i] == Outcome::Fail || run.outcome[i] == Outcome::Skip);
+      if (!hasError) continue;
+      append(out, size, used, "%s\"%s\":\"%s\"", first ? "" : ",", TEST_NAMES[i], testError[i]);
+      first = false;
+    }
+    append(out, size, used, "}");
+  }
+  if (done) append(out, size, used, ",\"done\":true");
+}
+
+/**
+ * The last upload of a run: the final status of every test, with the error
+ * texts, so the server records the Board tests without TTL. Sent after netloc,
+ * with the serving cell and no Wi-Fi (the netloc uploads already had it).
+ */
+void send_results_upload() {
+  static char payload[NETLOC_PAYLOAD_SIZE];
+  stepwhere::WifiScanResult noWifi;
+  noWifi.clear();
+  int status = 0;
+  for (uint8_t attempt = 1; attempt <= SUMMARY_ATTEMPTS && status != 201; attempt++) {
+    if (attempt > 1) wait_ms(SUMMARY_RETRY_MS);
+    char reply[AT_REPLY_CAPACITY];
+    ServingCell cell;
+    const char *cellError = nullptr;
+    if (at("AT+NETDMSG", AT_TIMEOUT_MS, reply, sizeof(reply)) != At::Ok || !parse_netdmsg(reply, cell, cellError)) {
+      cell = ServingCell{};
+    }
+    uint8_t wifiSent = 0;
+    // Without the error texts if they do not fit: the statuses matter most.
+    if (!build_netloc_payload(payload, sizeof(payload), cell, noWifi, wifiSent, true, true)
+        && !build_netloc_payload(payload, sizeof(payload), cell, noWifi, wifiSent, true, false)) {
+      SerialDBG.println("[QA] Results upload too large, not sent.");
+      return;
+    }
+    status = http_post_json(payload);
+    SerialDBG.print("[QA] Results upload, attempt ");
+    SerialDBG.print(attempt);
+    SerialDBG.print(": HTTP ");
+    SerialDBG.println(status);
+  }
+  SerialDBG.println(status == 201 ? "[QA] Results sent to the server: they show on the unit in admin (Board tests)."
+                                  : "[QA] Results upload failed: admin shows this run only if TTL is connected.");
 }
 
 /**
@@ -1861,7 +1988,7 @@ void test_netloc() {
   const uint32_t startedAt = millis();
   uint8_t sent = 0, accepted = 0, withWifi = 0, withCell = 0;
   int lastStatus = 0;
-  static char payload[1600];
+  static char payload[NETLOC_PAYLOAD_SIZE];
   static stepwhere::WifiScanResult wifi;
   for (uint8_t i = 0; i < NETLOC_UPLOADS && !aborted(); i++) {
     const uint32_t due = startedAt + (uint32_t)i * NETLOC_INTERVAL_MS;
@@ -1934,7 +2061,10 @@ void run_tests(uint16_t requested) {
   run.registered = false;
   run.batteryLow = false;
   run.imei[0] = '\0';
-  for (uint8_t i = 0; i < TEST_COUNT; i++) run.outcome[i] = Outcome::None;
+  for (uint8_t i = 0; i < TEST_COUNT; i++) {
+    run.outcome[i] = Outcome::None;
+    testError[i][0] = '\0';
+  }
 
   SerialDBG.print("[QA] Run ");
   SerialDBG.print(run.number);
@@ -2019,6 +2149,9 @@ void run_tests(uint16_t requested) {
     else if (run.outcome[i] == Outcome::Fail) failedCount++;
     else skippedCount++;
   }
+  // Only a run that made uploads sends its results: the server keys them to those uploads' board.
+  if (selected(T_NETLOC) && passed(T_DATA) && !aborted()) send_results_upload();
+
   const uint32_t ms = millis() - run.startedAt;
   run_line("done").unum("passed", passedCount).unum("failed", failedCount).unum("skipped", skippedCount).unum("ms", ms).end();
   SerialDBG.print("[QA] Run ");
@@ -2146,7 +2279,8 @@ void setup() {
   // INT2 (PB4) is set up by lis2ds12_configure() once a LIS2DS12 is found.
   qaI2c.begin();
 
-  hang_check_at_boot();
+  hang_check_at_boot();  // also opens the backup registers make_boot_session() uses
+  make_boot_session();
   watchdog_start();
   SerialDBG.begin(CONSOLE_BAUD);
   delay(200);

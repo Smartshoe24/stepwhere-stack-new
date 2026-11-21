@@ -41,6 +41,18 @@ export function reportFirmware(input: Pick<LocationTelemetryInput, "qa" | "fw">)
   return input.qa?.fw ?? input.fw?.app ?? null;
 }
 
+/**
+ * Whether a device with these child bindings may be added to QA from an upload.
+ * Never while it is bound. A device bound before (a customer's tracker, or a
+ * bench board that was lent to a child) only from QA firmware uploads: that
+ * firmware is flashed by cable on purpose, and production firmware never sends
+ * the "qa" block, so a customer's tracker is not pulled into QA by itself.
+ */
+export function autoRegisterAllowedForBindings(bindings: ReadonlyArray<{ unboundAt: Date | null }>, isQaFirmware: boolean) {
+  if (bindings.some((binding) => binding.unboundAt === null)) return false;
+  return bindings.length === 0 || isQaFirmware;
+}
+
 /** QA firmware starts a new unit at Board tests, production firmware at Production firmware. */
 export function autoRegisterStage(input: Pick<LocationTelemetryInput, "qa">): QaUnitStage {
   return input.qa ? "board_tests" : "production_firmware";

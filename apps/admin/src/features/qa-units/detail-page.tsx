@@ -561,7 +561,7 @@ function TestRuns({ runs }: { runs: QaTestRunDto[] }) {
         <EmptyState
           compact
           title='No board tests yet'
-          description='Flash a QA firmware build on the Bench with the serial console open. The tests run at boot and land here.'
+          description='Flash a QA firmware build on the Bench. The tests run at boot and land here: live with the serial console open, or with the board’s uploads at the end of the run (qa-0.7.4 and later) without it.'
         />
       </Panel>
     )
@@ -587,7 +587,11 @@ function TestRuns({ runs }: { runs: QaTestRunDto[] }) {
             </span>
             <span className='min-w-0 flex-1 truncate text-xs text-ink-3'>
               <span className='font-mono'>{run.firmwareVersion}</span>
-              {run.stationName ? ` · ${run.stationName}` : ''}
+              {run.source === 'network'
+                ? ' · sent over the network (no TTL)'
+                : run.stationName
+                  ? ` · ${run.stationName}`
+                  : ''}
             </span>
             <time
               className='shrink-0 text-xs text-ink-4 tabular'

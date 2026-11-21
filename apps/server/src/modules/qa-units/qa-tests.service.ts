@@ -1,16 +1,23 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { QA_BOARD_TEST_IDS, QA_BOARD_TESTS } from "@stepwhere/types";
-import type { QaBoardTestId, QaSerialLine, QaTtlMessage } from "@stepwhere/types";
+import type { QaBoardTestId, QaSerialLine, QaTelemetryInput, QaTtlMessage } from "@stepwhere/types";
 
 import { db } from "../../db/client";
 import { qaTestRuns, qaUnits } from "../../db/schema";
 import { handleRunFinished } from "../qa-bench/qa-automation.service";
 import { findSlotIdForPort } from "../qa-bench/qa-slots.service";
 import { getSafeErrorDetails } from "../../shared/background-task";
-import { applyTtlMessage, combineBoardTestRuns, countResults, emptyResults, parseQaTtlLine } from "./qa-tests.helpers";
+import {
+  applyTtlMessage,
+  applyUploadResults,
+  combineBoardTestRuns,
+  countResults,
+  emptyResults,
+  parseQaTtlLine,
+} from "./qa-tests.helpers";
 import { listFinishedUnitRuns, loadRunDto } from "./qa-test-runs.query";
 import { broadcastTestRunChanged, broadcastUnitChanged } from "./qa-units.realtime";
-import { normalizeImei } from "./qa-units.helpers";
+import { normalizeChipUid, normalizeImei } from "./qa-units.helpers";
 import { addEvent, linkImeiReportedByBoard, upsertUnitByChip } from "./qa-units.service";
 
 type RunRow = typeof qaTestRuns.$inferSelect;
@@ -98,8 +105,11 @@ async function startRun({ stationId, path }: Port, chipUid: string, runNumber: n
   return run;
 }
 
-/** Records the finished run on its unit: Board tests passed or failed, plus a timeline entry. */
-async function finishRun(run: RunRow, stationId: string) {
+/**
+ * Records the finished run on its unit: Board tests passed or failed, plus a timeline entry.
+ * `stationId` is null for a run sent in the board's uploads (no Bench involved).
+ */
+async function finishRun(run: RunRow, stationId: string | null) {
   const counts = countResults(run.results);
   const status = counts.failed > 0 ? "failed" : "passed";
   const now = new Date();
@@ -132,6 +142,7 @@ async function finishRun(run: RunRow, stationId: string) {
       ? `${retried}Board tests failed: ${labels(verdict.failing)}.`
       : `${retried}Still to test: ${labels(verdict.untested)}.`;
   const scrapped = unit.stageStatus === "scrapped";
+  const message = run.networkSession ? `${summary} (sent in the board's uploads, no TTL)` : summary;
 
   await db.transaction(async (tx) => {
     await tx
@@ -144,7 +155,7 @@ async function finishRun(run: RunRow, stationId: string) {
     await addEvent(tx, {
       unitId: unit.id,
       kind: "test_run",
-      message: summary,
+      message,
       stage: scrapped ? null : "board_tests",
       stageStatus: scrapped ? null : verdict.status,
       data: {
@@ -160,7 +171,8 @@ async function finishRun(run: RunRow, stationId: string) {
 
   broadcastUnitChanged(unit.id, stationId);
 
-  if (!scrapped) {
+  // Bench automation (retries, the production flash) needs the board on a station.
+  if (!scrapped && stationId) {
     await handleRunFinished({
       stationId,
       slotId: run.slotId,
@@ -207,6 +219,96 @@ async function handleMessage(port: Port, message: QaTtlMessage, at: Date) {
     if (imei) {
       await linkImeiReportedByBoard(run.unitId, imei, stationId);
     }
+  }
+
+  await publishRun(run.id);
+}
+
+/**
+ * A TTL run of the same board started this recently means the Bench console
+ * already records this boot's tests, so the copy in the uploads is ignored.
+ * A run takes about 10 minutes from boot to its last upload.
+ */
+export const QA_UPLOAD_RUN_TTL_WINDOW_MS = 15 * 60 * 1_000;
+
+/**
+ * Board tests sent in the QA firmware's uploads (qa-0.7.4 and later), for a
+ * board tested without TTL. One run per boot session and run number; the
+ * upload marked `done` finishes it and sets the unit's Board tests verdict,
+ * as a TTL run does.
+ */
+export async function recordUploadedRun(unitId: string, qa: QaTelemetryInput, at: Date) {
+  if (!qa.s || qa.run == null || !qa.results || Object.keys(qa.results).length === 0) {
+    return;
+  }
+
+  const chipUid = normalizeChipUid(qa.uid);
+
+  if (!chipUid) {
+    return;
+  }
+
+  const [ttlRun] = await db
+    .select({ id: qaTestRuns.id })
+    .from(qaTestRuns)
+    .where(and(
+      eq(qaTestRuns.chipUid, chipUid),
+      isNull(qaTestRuns.networkSession),
+      ne(qaTestRuns.status, "aborted"),
+      gte(qaTestRuns.startedAt, new Date(at.getTime() - QA_UPLOAD_RUN_TTL_WINDOW_MS)),
+    ))
+    .limit(1);
+
+  if (ttlRun) {
+    return;
+  }
+
+  const session = qa.s.toUpperCase();
+  const [existing] = await db
+    .select()
+    .from(qaTestRuns)
+    .where(and(eq(qaTestRuns.unitId, unitId), eq(qaTestRuns.networkSession, session), eq(qaTestRuns.runNumber, qa.run)))
+    .limit(1);
+
+  if (existing && existing.status !== "running") {
+    return;   // already finished; a repeated last upload changes nothing
+  }
+
+  if (!existing) {
+    // A new boot or run: the board's earlier unfinished upload runs will not be finished any more.
+    await abortRuns(and(eq(qaTestRuns.unitId, unitId), isNotNull(qaTestRuns.networkSession)));
+  }
+
+  const results = applyUploadResults(existing?.results ?? [], qa, at);
+  const [run] = existing
+    ? await db
+      .update(qaTestRuns)
+      .set({ results, ...countResults(results), firmwareVersion: qa.fw })
+      .where(eq(qaTestRuns.id, existing.id))
+      .returning()
+    : await db
+      .insert(qaTestRuns)
+      .values({
+        unitId,
+        stationId: null,
+        serialPath: null,
+        slotId: null,
+        chipUid,
+        firmwareVersion: qa.fw,
+        runNumber: qa.run,
+        networkSession: session,
+        results,
+        ...countResults(results),
+        startedAt: at,
+      })
+      .returning();
+
+  if (!run) {
+    return;
+  }
+
+  if (qa.done) {
+    await finishRun(run, null);
   }
 
   await publishRun(run.id);

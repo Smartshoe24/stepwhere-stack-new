@@ -232,6 +232,11 @@ export const qaTestRuns = pgTable("qa_test_runs", {
   firmwareVersion: text("firmware_version").notNull(),
   /** The firmware's run counter since boot. */
   runNumber: integer("run_number").notNull(),
+  /**
+   * Set when the run came in the board's location uploads instead of TTL
+   * (qa-0.7.4 and later): the firmware's random per-boot session ID.
+   */
+  networkSession: text("network_session"),
   status: qaTestRunStatusEnum("status").notNull().default("running"),
   results: jsonb("results").$type<QaTestResultDto[]>().notNull(),
   passed: smallint("passed").notNull().default(0),

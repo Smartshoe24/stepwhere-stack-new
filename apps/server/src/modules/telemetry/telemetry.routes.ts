@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { QA_BOARD_TEST_IDS } from "@stepwhere/types";
 
 import { createOpenApiApp } from "../../openapi/create-app";
 import { errorResponses, jsonDataResponse } from "../../openapi/responses";
@@ -216,9 +217,21 @@ const firmwareStatusSchema = z.object({
 });
 
 // Sent by the QA firmware's netloc test (apps/firmware/stepwhere.qa.ino).
+// qa-0.7.4 adds the board test results, so a board without TTL is still tested.
+// Keys are not limited to today's test IDs: a newer firmware with an extra test
+// must not get its location upload rejected. The server reads only known IDs.
+const qaTestKeySchema = z.string().min(1).max(16);
+const qaMaxTests = QA_BOARD_TEST_IDS.length + 8;
 const qaTelemetrySchema = z.object({
   uid: z.string().regex(/^[0-9A-Fa-f]{24}$/),
   fw: z.string().trim().min(1).max(24),
+  s: z.string().regex(/^[0-9A-Fa-f]{8}$/).optional(),
+  run: z.number().int().min(0).max(1_000_000).optional(),
+  results: z.record(qaTestKeySchema, z.enum(["pass", "fail", "skip", "running", "pending"]))
+    .refine((value) => Object.keys(value).length <= qaMaxTests, "too many tests").optional(),
+  errors: z.record(qaTestKeySchema, z.string().max(120))
+    .refine((value) => Object.keys(value).length <= qaMaxTests, "too many tests").optional(),
+  done: z.boolean().optional(),
 });
 
 const locationSchema = z.object({
