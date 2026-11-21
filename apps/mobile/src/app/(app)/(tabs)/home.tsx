@@ -75,6 +75,14 @@ import { AppIcon } from "@/components/ui/app-icon";
 import { getRuntimeThemeName } from "@/components/theme/switch-runtime-theme";
 import { useThemeTransition } from "@/components/theme/use-theme-transition";
 import { useAuth } from "@/features/auth/use-auth";
+import { BillingBanner } from "@/features/billing/billing-banner";
+import { isSubscriptionRequiredError } from "@/features/billing/billing-errors";
+import {
+  clearSubscriptionRequired,
+  reportSubscriptionRequired,
+} from "@/features/billing/subscription-lock";
+import { SubscriptionLockedCard } from "@/features/billing/subscription-locked-card";
+import { useChildSubscriptionLock } from "@/features/billing/use-child-subscription-lock";
 import {
   useMobileRealtimeConnectionRevision,
   useMobileRealtimeEvent,
@@ -650,6 +658,7 @@ export default function HomeScreen() {
     DEFAULT_TELEMETRY_HEIGHT,
   );
   const [summaryHeight, setSummaryHeight] = useState(DEFAULT_SUMMARY_HEIGHT);
+  const [billingBannerHeight, setBillingBannerHeight] = useState(0);
   const [geofenceUiState, dispatchGeofenceUiState] = React.useReducer(
     geofenceUiReducer,
     initialGeofenceUiState,
@@ -757,6 +766,10 @@ export default function HomeScreen() {
       null,
     [children, effectiveSelectedChildId],
   );
+  // Billing locks are per child: an uncovered shoe gets the locked card, a
+  // covered sibling keeps working.
+  const subscriptionLock = useChildSubscriptionLock(selectedChild?.id ?? null);
+  const isSelectedChildLocked = Boolean(selectedChild && subscriptionLock.locked);
   const activeShareQuery = useActiveChildShareQuery(
     selectedChild?.id ?? null,
     canUseLiveSharing && isHomeFocused,
@@ -866,7 +879,7 @@ export default function HomeScreen() {
   const mapControlsTopOffset =
     isMapFullscreen || isNormalMapInteraction
       ? topBarHeight + 16
-      : topBarHeight + secondaryTopChromeHeight + telemetryHeight + 28;
+      : topBarHeight + secondaryTopChromeHeight + telemetryHeight + billingBannerHeight + 28;
   const visibleGeofenceRadius =
     selectedGeofence.status === "editing"
       ? selectedGeofence.radiusMeters
@@ -1886,6 +1899,7 @@ export default function HomeScreen() {
         });
 
         trailRetryAttemptRef.current[childId] = 0;
+        clearSubscriptionRequired(childId);
 
         if (__DEV__) {
           console.info("[trail] loaded", {
@@ -1920,7 +1934,9 @@ export default function HomeScreen() {
           });
         }
 
-        if (
+        if (isSubscriptionRequiredError(error)) {
+          reportSubscriptionRequired(childId);
+        } else if (
           effectiveSelectedChildId === childId &&
           shouldRetryTrailRefresh(error)
         ) {
@@ -3494,14 +3510,38 @@ export default function HomeScreen() {
                 telemetryStyle,
               ]}
             >
-              <View onLayout={handleTelemetryLayout} style={styles.telemetryWrap}>
-                <TelemetryBar selectedChild={selectedChild} />
+              {isSelectedChildLocked ? null : (
+                <View onLayout={handleTelemetryLayout} style={styles.telemetryWrap}>
+                  <TelemetryBar selectedChild={selectedChild} />
+                </View>
+              )}
+              <View
+                onLayout={(event) => {
+                  setBillingBannerHeight(Math.round(event.nativeEvent.layout.height));
+                }}
+              >
+                <BillingBanner
+                  hidden={isSelectedChildLocked}
+                  style={styles.billingBanner}
+                />
               </View>
             </Animated.View>
           </View>
         ) : null}
 
-        {showHomeBottomChrome && selectedChild && !isWaitingForFirstLocation ? (
+        {isSelectedChildLocked && selectedChild ? (
+          <View pointerEvents="box-none" style={styles.lockedLayer}>
+            <View style={styles.lockedScrim} />
+            <SubscriptionLockedCard
+              childName={selectedChild.name.split(/\s+/)[0] ?? selectedChild.name}
+              lock={subscriptionLock}
+              style={styles.lockedCard(topBarHeight + secondaryTopChromeHeight + 16)}
+              variant="home"
+            />
+          </View>
+        ) : null}
+
+        {showHomeBottomChrome && selectedChild && !isWaitingForFirstLocation && !isSelectedChildLocked ? (
           selectedGeofence.status === "editing" ? (
             <GeofenceRadiusEditorCard
               bottomOffset={summaryBottomOffset}
@@ -3544,7 +3584,7 @@ export default function HomeScreen() {
         ) : null}
         </BlurTargetView>
 
-        {selectedChild ? (
+        {selectedChild && !isSelectedChildLocked ? (
           <FirstLocationGate
             blurTarget={firstLocationBlurTargetRef}
             childId={selectedChild.id}
@@ -3657,6 +3697,26 @@ const styles = StyleSheet.create((theme) => ({
     marginHorizontal: theme.spacing[4],
     marginTop: theme.spacing[3],
   },
+  billingBanner: {
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[3],
+  },
+  // The map stays visible but faded behind a locked child's card.
+  lockedLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+  },
+  lockedScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.background,
+    opacity: 0.6,
+  },
+  lockedCard: (top: number) => ({
+    position: "absolute",
+    top,
+    left: theme.spacing[4],
+    right: theme.spacing[4],
+  }),
   emptyState: {
     flex: 1,
     alignItems: "center",

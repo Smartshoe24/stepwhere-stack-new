@@ -29,6 +29,18 @@ export const queryKeys = {
   familyMembers: (organizationId: string | null | undefined) => ['family-members', organizationId ?? 'anonymous'] as const,
   unreadNotificationCount: (organizationId: string | null | undefined) => ['notification-unread-count', organizationId ?? 'anonymous'] as const,
   notifications: (scope: string) => ['notifications', scope] as const,
+  // Everything billing shares the 'billing' prefix so a payment can refresh it
+  // in one invalidation.
+  billing: ['billing'] as const,
+  billingOverview: (organizationId: string | null | undefined) => ['billing', 'overview', organizationId ?? 'anonymous'] as const,
+  billingCharges: (organizationId: string | null | undefined) => ['billing', 'charges', organizationId ?? 'anonymous'] as const,
+  billingCheckout: (checkoutId: string) => ['billing', 'checkout', checkoutId] as const,
+  billingQuote: (
+    organizationId: string | null | undefined,
+    kind: string,
+    deviceIds: readonly string[],
+    termMonths: number | null,
+  ) => ['billing', 'quote', organizationId ?? 'anonymous', kind, [...deviceIds].sort().join(','), termMonths ?? 0] as const,
   childTrail: (
     childId: string,
     distanceMeters: number,

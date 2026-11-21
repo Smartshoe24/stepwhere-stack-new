@@ -3,6 +3,7 @@ import React from "react";
 
 import { AppBootstrapScreen } from "@/components/loading/app-bootstrap-screen";
 import { useAuth } from "@/features/auth/use-auth";
+import { FakeCheckoutHost } from "@/features/billing/fake-checkout-sheet";
 import { MobileRealtimeProvider } from "@/features/realtime/mobile-realtime-provider";
 
 export default function AppLayout() {
@@ -39,6 +40,8 @@ export default function AppLayout() {
   return (
     <MobileRealtimeProvider organizationId={organizationId}>
       <Stack screenOptions={{ headerShown: false }} />
+      {/* Dev builds only: stands in for the payment SDK's checkout. */}
+      <FakeCheckoutHost />
     </MobileRealtimeProvider>
   );
 }

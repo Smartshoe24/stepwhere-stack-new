@@ -47,7 +47,8 @@ export const pushInstallationPlatformEnum = pgEnum("push_installation_platform",
 export const pushInstallationStatusEnum = pgEnum("push_installation_status", ["active", "disabled"]);
 export const pushDeliveryStatusEnum = pgEnum("push_delivery_status", ["pending", "ticketed", "delivered", "failed", "cancelled"]);
 export const notificationPriorityEnum = pgEnum("notification_priority", ["general", "child_safety"]);
-export const notificationTypeEnum = pgEnum("notification_type", ["geofence_breached", "geofence_reentered"]);
+// Billing alerts are push-only: stored as already read and kept out of the safety inbox.
+export const notificationTypeEnum = pgEnum("notification_type", ["geofence_breached", "geofence_reentered", "billing"]);
 export const placeKindEnum = pgEnum("place_kind", ["school"]);
 export const locationSourceEnum = pgEnum("location_source", ["gps", "cell", "network", "none"]);
 export const cellLookupModeEnum = pgEnum("cell_lookup_mode", ["normal", "fast"]);

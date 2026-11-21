@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { NotificationInboxItemDto, NotificationInboxResponseDto } from "@stepwhere/types";
 
 import { db } from "../../db/client";
@@ -48,13 +48,15 @@ async function toInboxItemDto(row: {
     }
     | null;
 
-  if (!rawData?.childId || !rawData.geofenceEventId) {
+  const type = row.notification.type;
+  // The inbox query leaves out billing alerts, which are push-only.
+  if (type === "billing" || !rawData?.childId || !rawData.geofenceEventId) {
     throw new Error(`Notification ${row.notification.id} is missing required route data.`);
   }
 
   return {
     id: row.notification.id,
-    type: row.notification.type,
+    type,
     priority: row.notification.priority,
     title: row.notification.title,
     body: row.notification.body,
@@ -83,7 +85,7 @@ export async function getUnreadNotificationCount(userId: string) {
       total: count(),
     })
     .from(userNotifications)
-    .where(and(eq(userNotifications.userId, userId), isNull(userNotifications.readAt)));
+    .where(and(eq(userNotifications.userId, userId), isNull(userNotifications.readAt), ne(userNotifications.type, "billing")));
 
   return row?.total ?? 0;
 }
@@ -105,6 +107,7 @@ export async function getNotificationInbox(input: {
     .leftJoin(children, eq(children.id, userNotifications.childId))
     .where(and(
       eq(userNotifications.userId, input.userId),
+      ne(userNotifications.type, "billing"),
       decodedCursor
         ? or(
           lt(userNotifications.occurredAt, decodedCursor.occurredAt),

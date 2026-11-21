@@ -7,6 +7,18 @@ import type {
   ActiveShareLinkResponseDto,
   ApiErrorDto,
   ApiSuccessDto,
+  ApplyBillingQuoteInput,
+  BillingChargesDto,
+  BillingCheckoutDto,
+  BillingFakeOutcome,
+  BillingOverviewDto,
+  BillingPaymentTokenDto,
+  BillingQuoteDto,
+  BillingRevisionInput,
+  BillingSubscriptionDto,
+  CreateBillingQuoteInput,
+  ScheduleBillingRenewalInput,
+  StartBillingCheckoutInput,
   ChildDetailDto,
   ChildActivityResponseDto,
   ArchiveChildResultDto,
@@ -638,6 +650,93 @@ export function createUserAvatarUploadIntent(input: CreateUserAvatarUploadIntent
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getBillingOverview(options?: ApiRequestOptions) {
+  return apiRequest<BillingOverviewDto>("/v1/billing/overview", undefined, options);
+}
+
+export function createBillingQuote(input: CreateBillingQuoteInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingQuoteDto>("/v1/billing/quotes", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function startBillingCheckout(input: StartBillingCheckoutInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingCheckoutDto>("/v1/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function getBillingCheckout(checkoutId: string, options?: ApiRequestOptions) {
+  return apiRequest<BillingCheckoutDto>(`/v1/billing/checkout/${encodeURIComponent(checkoutId)}`, undefined, options);
+}
+
+export function addBillingShoes(input: ApplyBillingQuoteInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingSubscriptionDto>("/v1/billing/subscription/add-shoes", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function scheduleBillingRenewal(input: ScheduleBillingRenewalInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingSubscriptionDto>("/v1/billing/subscription/renewal", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function cancelBillingSubscription(input: BillingRevisionInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingSubscriptionDto>("/v1/billing/subscription/cancel", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function resumeBillingSubscription(input: BillingRevisionInput, options?: ApiRequestOptions) {
+  return apiRequest<BillingSubscriptionDto>("/v1/billing/subscription/resume", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+/** Starts a new autopay that replaces the current one once it is approved. */
+export function startBillingAutopayReplacement(input: { idempotencyKey: string }, options?: ApiRequestOptions) {
+  return apiRequest<BillingCheckoutDto>("/v1/billing/subscription/autopay", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, options);
+}
+
+export function payBillingChargeNow(chargeId: string, options?: ApiRequestOptions) {
+  return apiRequest<{ chargeId: string; token: BillingPaymentTokenDto }>(
+    `/v1/billing/charges/${encodeURIComponent(chargeId)}/pay-now`,
+    { method: "POST" },
+    options,
+  );
+}
+
+export function getBillingCharges(options?: ApiRequestOptions) {
+  return apiRequest<BillingChargesDto>("/v1/billing/charges", undefined, options);
+}
+
+/** Dev only: settles a fake-provider mandate, charge or payment. */
+export function applyFakeBillingOutcome(
+  kind: "mandate" | "charge" | "payment",
+  id: string,
+  outcome: BillingFakeOutcome,
+  options?: ApiRequestOptions,
+) {
+  return apiRequest<{ ok: true }>(
+    `/v1/billing/dev/fake/${kind}/${encodeURIComponent(id)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ outcome }),
+    },
+    options,
+  );
 }
 
 export async function uploadToSignedUrl(input: {

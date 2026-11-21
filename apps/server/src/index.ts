@@ -12,7 +12,8 @@ import { pushReceiptsWorker } from "./modules/push/push-receipts.worker";
 import { cleanupExpiredTrailGeometryCache } from "./modules/telemetry/telemetry.service";
 import { processDueAccountDeletions } from "./modules/account-deletion/account-deletion.worker";
 import { emitPlayReviewTelemetry } from "./modules/play-review/play-review-telemetry.worker";
-import { maintainBillingCoverage, processBillingEvents, reconcileDueSubscriptions } from "./modules/billing/billing.worker";
+import { maintainBillingCoverage, processBillingEvents, reconcileMandates, runBillingCharges } from "./modules/billing/billing.worker";
+import { sendBillingReminders } from "./modules/billing/billing-notifications.service";
 import {
   runBackgroundTaskPhase,
   scheduleBackgroundTask,
@@ -51,7 +52,9 @@ scheduleBackgroundTask({
 
 scheduleBackgroundTask({ name: "billing-events", initialDelayMs: 3_000, intervalMs: 30_000, task: () => processBillingEvents() });
 scheduleBackgroundTask({ name: "billing-coverage", initialDelayMs: 4_000, intervalMs: 30_000, task: () => maintainBillingCoverage() });
-scheduleBackgroundTask({ name: "billing-reconciliation", initialDelayMs: 15_000, intervalMs: 60_000, task: () => reconcileDueSubscriptions() });
+scheduleBackgroundTask({ name: "billing-charges", initialDelayMs: 15_000, intervalMs: 60_000, task: () => runBillingCharges() });
+scheduleBackgroundTask({ name: "billing-reminders", initialDelayMs: 60_000, intervalMs: 60 * 60_000, task: () => sendBillingReminders() });
+scheduleBackgroundTask({ name: "billing-mandates", initialDelayMs: 20_000, intervalMs: 10 * 60_000, task: () => reconcileMandates() });
 
 scheduleBackgroundTask({
   name: "push-outbox",

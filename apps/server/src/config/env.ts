@@ -57,18 +57,11 @@ const envSchema = z.object({
   ENABLE_API_REFERENCE: z.enum(["true", "false"]).default("false"),
   REALTIME_DEBUG: z.enum(["true", "false"]).default("false"),
   BILLING_PURCHASES_ENABLED: z.enum(["true", "false"]).default("false"),
-  BILLING_EARLY_CREDIT_ENABLED: z.enum(["true", "false"]).default("false"),
   BILLING_ENFORCEMENT_ENABLED: z.enum(["true", "false"]).default("false"),
   BILLING_PILOT_ORGANIZATION_IDS: z.string().default(""),
   // Durable family ownership of a physical shoe (claim on bind, 409 for another
   // family). Independent of enforcement; "false" skips claims entirely.
   BILLING_DEVICE_OWNERSHIP_ENABLED: z.enum(["true", "false"]).default("true"),
-  BILLING_STORE_ENVIRONMENT: z.enum(["SANDBOX", "PRODUCTION"]).default("SANDBOX"),
-  SUPERWALL_API_KEY: z.string().min(1).optional(),
-  SUPERWALL_PROJECT_ID: z.string().min(1).optional(),
-  SUPERWALL_APPLICATION_IDS: z.string().optional(),
-  SUPERWALL_WEBHOOK_SECRET: z.string().min(1).optional(),
-  BILLING_OFFER_CODE_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   INITIAL_ADMIN_EMAIL: z.string().trim().toLowerCase().email().default("admin@stepwhere.in"),
   // One-time code for the first-run admin setup (plan section 11.2). Setup is
   // disabled while unset; an empty value counts as unset.
@@ -76,6 +69,16 @@ const envSchema = z.object({
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     z.string().min(16, "Use at least 16 characters, e.g. `openssl rand -hex 16`.").optional(),
   ),
+  // "fake" stands in for the payment provider until Cashfree is connected.
+  BILLING_PROVIDER: z.enum(["fake", "cashfree"]).default("fake"),
+  BILLING_ENVIRONMENT: z.enum(["SANDBOX", "PRODUCTION"]).default("SANDBOX"),
+  BILLING_MANDATE_MAX_MINOR: z.coerce.number().int().positive().default(500_000),
+  BILLING_LEGAL_NAME: z.string().min(1).optional(),
+  BILLING_GSTIN: z.string().regex(/^[0-9]{2}[A-Z0-9]{13}$/).optional(),
+  CASHFREE_CLIENT_ID: z.string().min(1).optional(),
+  CASHFREE_CLIENT_SECRET: z.string().min(1).optional(),
+  CASHFREE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  CASHFREE_API_VERSION: z.string().default("2026-01-01"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -171,22 +174,24 @@ if (parsedEnv.data.NODE_ENV === "production") {
   }
 }
 
-if (parsedEnv.data.BILLING_PURCHASES_ENABLED === "true") {
-  const missing = ["SUPERWALL_API_KEY", "SUPERWALL_PROJECT_ID", "SUPERWALL_APPLICATION_IDS", "SUPERWALL_WEBHOOK_SECRET"].filter((key) => !parsedEnv.data[key as keyof typeof parsedEnv.data]);
-  if (missing.length) throw new Error(`Billing purchases require: ${missing.join(", ")}`);
+if (parsedEnv.data.BILLING_PROVIDER === "fake" && parsedEnv.data.BILLING_ENVIRONMENT === "PRODUCTION") {
+  throw new Error("The fake billing provider can only run with BILLING_ENVIRONMENT=SANDBOX.");
 }
-if (parsedEnv.data.BILLING_EARLY_CREDIT_ENABLED === "true" && !parsedEnv.data.BILLING_OFFER_CODE_KEY) {
-  throw new Error("Early billing credits require BILLING_OFFER_CODE_KEY.");
+// Anyone could approve their own fake payments, so a deployed server never sells through it.
+if (parsedEnv.data.BILLING_PROVIDER === "fake" && parsedEnv.data.BILLING_PURCHASES_ENABLED === "true" && parsedEnv.data.NODE_ENV === "production") {
+  throw new Error("Billing purchases on a production server need BILLING_PROVIDER=cashfree.");
+}
+if (parsedEnv.data.BILLING_PROVIDER === "cashfree" && parsedEnv.data.BILLING_PURCHASES_ENABLED === "true") {
+  const missing = ["CASHFREE_CLIENT_ID", "CASHFREE_CLIENT_SECRET", "CASHFREE_WEBHOOK_SECRET"].filter((key) => !parsedEnv.data[key as keyof typeof parsedEnv.data]);
+  if (missing.length) throw new Error(`Cashfree billing requires: ${missing.join(", ")}`);
 }
 
 export const env = {
   ...parsedEnv.data,
   BILLING_PURCHASES_ENABLED: parsedEnv.data.BILLING_PURCHASES_ENABLED === "true",
-  BILLING_EARLY_CREDIT_ENABLED: parsedEnv.data.BILLING_EARLY_CREDIT_ENABLED === "true",
   BILLING_ENFORCEMENT_ENABLED: parsedEnv.data.BILLING_ENFORCEMENT_ENABLED === "true",
   BILLING_DEVICE_OWNERSHIP_ENABLED: parsedEnv.data.BILLING_DEVICE_OWNERSHIP_ENABLED === "true",
   BILLING_PILOT_ORGANIZATION_IDS: parsedEnv.data.BILLING_PILOT_ORGANIZATION_IDS.split(",").map((id) => id.trim()).filter(Boolean),
-  SUPERWALL_APPLICATION_IDS: parsedEnv.data.SUPERWALL_APPLICATION_IDS?.split(",").map((id) => id.trim()).filter(Boolean) ?? [],
   ENABLE_API_REFERENCE: parsedEnv.data.ENABLE_API_REFERENCE === "true",
   REALTIME_DEBUG: parsedEnv.data.REALTIME_DEBUG === "true",
   DISABLE_TWILLIO_OTP:
