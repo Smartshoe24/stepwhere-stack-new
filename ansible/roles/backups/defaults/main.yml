@@ -23,7 +23,7 @@ backups_jobs:
     schedule: "*-*-* 21:00:00 UTC"
     enabled: "{{ backups_rds_endpoint | length > 0 }}"
   - name: stepwhere-config-backup
-    description: Stepwhere config archive (Pangolin, Beszel) to S3
+    description: Stepwhere config archive (Pangolin, Beszel, Dozzle) to S3
     schedule: "*-*-* 21:30:00 UTC"
     enabled: true
 
@@ -31,6 +31,7 @@ backups_jobs:
 backups_config_paths:
   - pangolin
   - beszel
+  - dozzle
 backups_config_excludes:
   - beszel/socket
 

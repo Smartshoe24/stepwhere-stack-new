@@ -15,3 +15,58 @@
     - "{{ monitoring_beszel_dir }}/socket"
     # Marker folder: the agent reports disk usage of the data volume from here.
     - "{{ monitoring_data_mount }}/.beszel"
+
+- name: Create the Dozzle data directory
+  ansible.builtin.file:
+    path: "{{ monitoring_dozzle_dir }}/data"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Check the Dozzle admin password
+  ansible.builtin.assert:
+    that: vault_dozzle_admin_password | default('') | length >= 16
+    fail_msg: Set vault_dozzle_admin_password (at least 16 characters) in group_vars/prod/vault.yml.
+    quiet: true
+  no_log: true
+
+# Written once. To change the password, delete users.yml and run the playbook again.
+- name: Check for the Dozzle users file
+  ansible.builtin.stat:
+    path: "{{ monitoring_dozzle_dir }}/data/users.yml"
+  register: monitoring_dozzle_users
+
+- name: Hash the Dozzle admin password
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - -i
+      - --rm
+      - "{{ dozzle_image }}"
+      - generate
+      - "{{ monitoring_dozzle_admin_user }}"
+      - --name
+      - "{{ monitoring_dozzle_admin_name }}"
+      - --email
+      - "{{ monitoring_dozzle_admin_email }}"
+    stdin: "{{ vault_dozzle_admin_password }}"
+  register: monitoring_dozzle_generated
+  changed_when: false
+  no_log: true
+  when:
+    - not monitoring_dozzle_users.stat.exists
+    - not ansible_check_mode
+
+- name: Write the Dozzle users file
+  ansible.builtin.copy:
+    content: "{{ monitoring_dozzle_generated.stdout }}\n"
+    dest: "{{ monitoring_dozzle_dir }}/data/users.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when:
+    - not monitoring_dozzle_users.stat.exists
+    - not ansible_check_mode

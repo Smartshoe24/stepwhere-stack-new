@@ -17,6 +17,10 @@ vault_pangolin_server_secret: "replace-me"
 # public key. Leave empty on the first run; the agent is not started while it is empty.
 vault_beszel_agent_key: ""
 
+# Dozzle's own login (user "admin"), on top of Pangolin SSO. At least 16 characters.
+# Written into /srv/dozzle/data/users.yml once; to change it, delete that file and re-run.
+vault_dozzle_admin_password: "replace-me"
+
 # Passwords for the two database roles that db-roles.yml creates on RDS.
 vault_rds_app_password: "replace-me"
 vault_rds_backup_password: "replace-me"
