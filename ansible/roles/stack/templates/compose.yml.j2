@@ -216,8 +216,14 @@ services:
     image: {{ dozzle_image }}
     restart: unless-stopped
     networks: [edge]
+    environment:
+      # Its own login on top of Pangolin SSO: other containers on the edge
+      # network can reach dozzle:8080 directly. Users live in /data/users.yml.
+      DOZZLE_AUTH_PROVIDER: simple
+      DOZZLE_AUTH_TTL: 12h
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - {{ stack_dozzle_dir }}/data:/data
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
       interval: 30s

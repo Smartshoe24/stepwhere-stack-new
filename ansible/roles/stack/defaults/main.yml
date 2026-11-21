@@ -2,6 +2,7 @@
 stack_dir: /srv/stepwhere
 stack_pangolin_dir: /srv/pangolin
 stack_beszel_dir: /srv/beszel
+stack_dozzle_dir: /srv/dozzle
 stack_redis_dir: /srv/redis
 stack_infisical_env_file: /etc/stepwhere/infisical.env
 

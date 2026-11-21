@@ -1,3 +1,7 @@
 ---
 monitoring_beszel_dir: /srv/beszel
 monitoring_data_mount: /srv
+monitoring_dozzle_dir: /srv/dozzle
+monitoring_dozzle_admin_user: admin
+monitoring_dozzle_admin_name: Stepwhere Admin
+monitoring_dozzle_admin_email: "{{ acme_email }}"
